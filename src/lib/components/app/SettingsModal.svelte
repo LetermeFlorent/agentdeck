@@ -114,6 +114,23 @@
         <span class="unit">min</span>
       </div>
     </div>
+
+    <div class="row">
+      <div class="lbl">
+        <span>Zoom par défaut</span>
+        <span class="sub">Taille du texte des nouveaux chats</span>
+      </div>
+      <div class="priv-ctl">
+        {#each [0.8, 0.9, 1, 1.1, 1.25] as z}
+          <button
+            type="button"
+            class="chip"
+            class:on={settings.defaultZoom === z}
+            onclick={() => settings.setDefaultZoom(z)}
+          >{Math.round(z * 100)}%</button>
+        {/each}
+      </div>
+    </div>
   </div>
 </div>
 

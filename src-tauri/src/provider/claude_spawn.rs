@@ -20,6 +20,7 @@ pub(super) async fn spawn(
     model: &Option<String>,
     effort: &Option<String>,
     token: &Option<String>,
+    resume: bool,
 ) -> Result<SessionProc, String> {
     let mut cmd = Command::new(claude_bin());
     cmd.arg("-p")
@@ -31,6 +32,14 @@ pub(super) async fn spawn(
         .arg("--include-partial-messages")
         .arg("--permission-mode")
         .arg("bypassPermissions");
+
+    // Persistance de la conversation : on (ré)utilise l'UUID agentdeck comme session Claude.
+    // 1ʳᵉ fois → on crée la session ; ensuite → on la reprend (mémoire conservée).
+    if resume {
+        cmd.arg("--resume").arg(id);
+    } else {
+        cmd.arg("--session-id").arg(id);
+    }
 
     if let Some(m) = model {
         if !m.is_empty() {

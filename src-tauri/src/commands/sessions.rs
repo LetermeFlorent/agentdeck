@@ -46,6 +46,9 @@ pub fn session_send(
     if token.is_none() && !auth::claude_logged_in() {
         return Err("Non connecté.".to_string());
     }
+    // Conversation déjà entamée → on reprend (--resume) au respawn ; sinon on la crée (--session-id).
+    let resume = mgr.was_started(&id);
+    mgr.mark_started(&id);
     let (proc, cwd) = mgr
         .send_ctx(&id)
         .ok_or_else(|| "Session inconnue.".to_string())?;
@@ -58,6 +61,7 @@ pub fn session_send(
         model,
         effort,
         token,
+        resume,
         text,
         images.unwrap_or_default(),
     ));

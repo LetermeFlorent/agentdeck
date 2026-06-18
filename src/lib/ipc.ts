@@ -103,7 +103,7 @@ export const claudeDefaults = () =>
 
 // ---- Plan d'abonnement ----
 export const subscriptionPlan = () =>
-  invoke<{ label: string; level: number }>("subscription_plan");
+  invoke<{ label: string; level: number; account: string }>("subscription_plan");
 
 // ---- Dépendance Claude Code ----
 export const checkClaude = () => invoke<boolean>("check_claude");

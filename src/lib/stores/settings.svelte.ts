@@ -8,6 +8,7 @@ interface Persisted {
   defaultEffort: string | null;
   unavailableModels: string[];
   privateAfterMin: number | null;
+  defaultZoom: number;
 }
 
 class SettingsStore {
@@ -21,6 +22,8 @@ class SettingsStore {
   unavailableModels = $state<string[]>([]);
   /** Minutes d'inactivité avant passage auto en mode privé (0 / null = désactivé). */
   privateAfterMin = $state<number | null>(null);
+  /** Zoom par défaut des nouveaux chats (1 = 100%). */
+  defaultZoom = $state(1);
 
   load() {
     try {
@@ -32,6 +35,7 @@ class SettingsStore {
       this.defaultEffort = p.defaultEffort ?? null;
       this.unavailableModels = p.unavailableModels ?? [];
       this.privateAfterMin = p.privateAfterMin ?? null;
+      this.defaultZoom = p.defaultZoom ?? 1;
     } catch {
       /* ignore */
     }
@@ -44,6 +48,7 @@ class SettingsStore {
       defaultEffort: this.defaultEffort,
       unavailableModels: this.unavailableModels,
       privateAfterMin: this.privateAfterMin,
+      defaultZoom: this.defaultZoom,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(p));
@@ -67,6 +72,11 @@ class SettingsStore {
   /** Délai d'inactivité (min) avant mode privé auto. <= 0 → désactivé (null). */
   setPrivateAfterMin(v: number | null) {
     this.privateAfterMin = v && v > 0 ? Math.round(v) : null;
+    this.save();
+  }
+  /** Zoom par défaut des nouveaux chats, borné à [0.6, 1.8]. */
+  setDefaultZoom(v: number) {
+    this.defaultZoom = Math.min(1.8, Math.max(0.6, Math.round(v * 100) / 100));
     this.save();
   }
 

@@ -19,7 +19,11 @@
 
   let initialized = $state(false);
   let booted = $state(false);
-  let plan = $state<{ label: string; level: number }>({ label: "", level: 0 });
+  let plan = $state<{ label: string; level: number; account: string }>({
+    label: "",
+    level: 0,
+    account: "",
+  });
   let claudeReady = $state<boolean | null>(null);
   let installing = $state(false);
   let installErr = $state<string | null>(null);
@@ -151,6 +155,9 @@
           <span class="plan plan-{plan.level}" use:tooltip={`Abonnement Claude : ${plan.label}`}>
             {plan.label}
           </span>
+        {/if}
+        {#if plan.account}
+          <span class="account" use:tooltip={`Compte connecté : ${plan.account}`}>{plan.account}</span>
         {/if}
       </div>
       <div class="spacer" data-tauri-drag-region></div>
@@ -342,6 +349,15 @@
   @keyframes planGlow {
     0%, 100% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), 0 3px 14px color-mix(in srgb, var(--accent) 45%, transparent); }
     50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 4px 22px color-mix(in srgb, var(--accent) 70%, transparent); }
+  }
+  .account {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .spacer {
     flex: 1;

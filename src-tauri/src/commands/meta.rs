@@ -73,6 +73,21 @@ pub fn subscription_plan() -> serde_json::Value {
             .to_string();
         Some((sub, tier))
     };
+    // Compte connecté (email / nom), lu dans ~/.claude.json → oauthAccount.
+    let account = (|| -> Option<String> {
+        let mut p = dirs::home_dir()?;
+        p.push(".claude.json");
+        let raw = std::fs::read_to_string(p).ok()?;
+        let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let o = v.get("oauthAccount")?;
+        o.get("displayName")
+            .and_then(|x| x.as_str())
+            .filter(|s| !s.is_empty())
+            .or_else(|| o.get("emailAddress").and_then(|x| x.as_str()))
+            .map(String::from)
+    })()
+    .unwrap_or_default();
+
     let (sub, tier) = read().unwrap_or_default();
     let (label, level): (String, u8) = if tier.contains("max_20x") {
         ("Max 20×".into(), 4)
@@ -97,5 +112,5 @@ pub fn subscription_plan() -> serde_json::Value {
             }
         }
     };
-    serde_json::json!({ "label": label, "level": level })
+    serde_json::json!({ "label": label, "level": level, "account": account })
 }

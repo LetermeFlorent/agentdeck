@@ -74,6 +74,13 @@ fn write_images(images: &[ImageInput]) -> Vec<String> {
     paths
 }
 
+/// Écrit une ligne (message stream-json) sur le stdin du process.
+async fn write_line(stdin: &mut tokio::process::ChildStdin, msg: &str) -> std::io::Result<()> {
+    stdin.write_all(msg.as_bytes()).await?;
+    stdin.write_all(b"\n").await?;
+    stdin.flush().await
+}
+
 /// Envoie un message à la session : (re)lance le process si besoin, puis écrit sur stdin.
 /// Fonctionne même si Claude est déjà en train de répondre (le message est pris en cours de route).
 #[allow(clippy::too_many_arguments)]
@@ -85,6 +92,7 @@ pub async fn send(
     model: Option<String>,
     effort: Option<String>,
     token: Option<String>,
+    resume: bool,
     text: String,
     images: Vec<ImageInput>,
 ) {
@@ -100,7 +108,7 @@ pub async fn send(
             let mut c = old.child;
             let _ = c.start_kill();
         }
-        match spawn(&app, &id, &cwd, &model, &effort, &token).await {
+        match spawn(&app, &id, &cwd, &model, &effort, &token, resume).await {
             Ok(p) => *guard = Some(p),
             Err(e) => {
                 emit(&app, &id, SessionEvent::Error { message: e });
@@ -110,35 +118,52 @@ pub async fn send(
         }
     }
 
+    // Images → fichiers temp + chemins ajoutés au texte (Claude les lit via Read).
+    let mut full_text = text;
+    let paths = write_images(&images);
+    if !paths.is_empty() {
+        full_text.push_str("\n\n[Images jointes par l'utilisateur — lis-les avec l'outil Read :]");
+        for path in &paths {
+            full_text.push('\n');
+            full_text.push_str(path);
+        }
+    }
+    let msg = json!({
+        "type": "user",
+        "message": { "role": "user", "content": [{ "type": "text", "text": full_text }] }
+    })
+    .to_string();
+
+    // 1ʳᵉ écriture. Si le pipe est fermé (process mort, ex. `--resume` sur une session inexistante
+    // pour un vieux chat), on relance en INVERSANT la stratégie session-id/resume et on réessaie.
+    let mut ok = false;
     if let Some(p) = guard.as_mut() {
-        // Images → fichiers temp + chemins ajoutés au texte (Claude les lit via Read).
-        let mut full_text = text;
-        let paths = write_images(&images);
-        if !paths.is_empty() {
-            full_text.push_str("\n\n[Images jointes par l'utilisateur — lis-les avec l'outil Read :]");
-            for path in &paths {
-                full_text.push('\n');
-                full_text.push_str(path);
+        ok = write_line(&mut p.stdin, &msg).await.is_ok();
+    }
+    if !ok {
+        if let Some(old) = guard.take() {
+            let mut c = old.child;
+            let _ = c.start_kill();
+        }
+        let retry_resume = if need_spawn { !resume } else { true };
+        match spawn(&app, &id, &cwd, &model, &effort, &token, retry_resume).await {
+            Ok(p) => *guard = Some(p),
+            Err(e) => {
+                emit(&app, &id, SessionEvent::Error { message: e });
+                emit(&app, &id, SessionEvent::Exited { code: None });
+                return;
             }
         }
-        let msg = json!({
-            "type": "user",
-            "message": { "role": "user", "content": [{ "type": "text", "text": full_text }] }
-        })
-        .to_string();
-        let write = async {
-            p.stdin.write_all(msg.as_bytes()).await?;
-            p.stdin.write_all(b"\n").await?;
-            p.stdin.flush().await
-        };
-        if let Err(e) = write.await {
-            emit(
-                &app,
-                &id,
-                SessionEvent::Error {
-                    message: format!("Écriture stdin : {e}"),
-                },
-            );
+        if let Some(p) = guard.as_mut() {
+            if let Err(e) = write_line(&mut p.stdin, &msg).await {
+                emit(
+                    &app,
+                    &id,
+                    SessionEvent::Error {
+                        message: format!("Écriture stdin : {e}"),
+                    },
+                );
+            }
         }
     }
 }

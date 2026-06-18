@@ -156,7 +156,7 @@ class SessionsStore {
       contextTokens: 0,
       contextWindow: 0,
       lastActivity: Date.now(),
-      zoom: 1,
+      zoom: settings.defaultZoom ?? 1,
     };
     await this.attach(id);
     this.touch();
