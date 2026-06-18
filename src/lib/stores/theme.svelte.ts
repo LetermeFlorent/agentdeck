@@ -1,0 +1,44 @@
+// Store de thème : choix utilisateur (system|light|dark) résolu en data-theme sur <html>.
+
+export type ThemeChoice = "system" | "light" | "dark";
+
+const KEY = "agentdeck.theme";
+
+function systemDark(): boolean {
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? true;
+}
+
+function resolve(choice: ThemeChoice): "light" | "dark" {
+  if (choice === "system") return systemDark() ? "dark" : "light";
+  return choice;
+}
+
+function apply(choice: ThemeChoice) {
+  document.documentElement.setAttribute("data-theme", resolve(choice));
+}
+
+class ThemeStore {
+  choice = $state<ThemeChoice>("system");
+
+  init() {
+    const saved = localStorage.getItem(KEY) as ThemeChoice | null;
+    this.choice = saved ?? "system";
+    apply(this.choice);
+    // Suivre le système quand le choix est "system".
+    window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", () => {
+      if (this.choice === "system") apply("system");
+    });
+  }
+
+  set(choice: ThemeChoice) {
+    this.choice = choice;
+    localStorage.setItem(KEY, choice);
+    apply(choice);
+  }
+
+  get resolved(): "light" | "dark" {
+    return resolve(this.choice);
+  }
+}
+
+export const theme = new ThemeStore();
