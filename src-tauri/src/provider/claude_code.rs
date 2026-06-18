@@ -74,6 +74,25 @@ fn write_images(images: &[ImageInput]) -> Vec<String> {
     paths
 }
 
+/// Vrai si Claude Code a déjà une session persistée pour cet id (fichier
+/// `~/.claude/projects/<projet>/<id>.jsonl`). Décide `--resume` vs `--session-id` de façon
+/// déterministe (pas de course, pas de --resume sur une session inexistante).
+fn session_exists(id: &str) -> bool {
+    let mut dir = match dirs::home_dir() {
+        Some(d) => d,
+        None => return false,
+    };
+    dir.push(".claude");
+    dir.push("projects");
+    let file = format!("{id}.jsonl");
+    match std::fs::read_dir(&dir) {
+        Ok(rd) => rd
+            .flatten()
+            .any(|e| e.path().is_dir() && e.path().join(&file).exists()),
+        Err(_) => false,
+    }
+}
+
 /// Écrit une ligne (message stream-json) sur le stdin du process.
 async fn write_line(stdin: &mut tokio::process::ChildStdin, msg: &str) -> std::io::Result<()> {
     stdin.write_all(msg.as_bytes()).await?;
@@ -92,11 +111,12 @@ pub async fn send(
     model: Option<String>,
     effort: Option<String>,
     token: Option<String>,
-    resume: bool,
     text: String,
     images: Vec<ImageInput>,
 ) {
     let mut guard = proc.lock().await;
+    // Reprend la conversation si Claude a déjà persisté cette session ; sinon la crée.
+    let resume = session_exists(&id);
 
     // (Re)lance si pas de process, ou si le modèle/effort a changé.
     let need_spawn = match &*guard {

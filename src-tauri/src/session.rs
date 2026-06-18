@@ -26,8 +26,6 @@ pub struct SessionMeta {
     pub cwd: Option<String>,
     pub model: Option<String>,
     pub proc: SharedProc,
-    /// Vrai si une conversation Claude existe déjà pour cet id (→ `--resume` au respawn).
-    pub started: bool,
 }
 
 #[derive(Serialize, Clone)]
@@ -46,57 +44,32 @@ pub struct SessionManager {
 impl SessionManager {
     pub fn create(&self, title: Option<String>, cwd: Option<String>, model: Option<String>) -> String {
         let id = Uuid::new_v4().to_string();
-        self.insert(id.clone(), title, cwd, model, false);
+        self.insert(id.clone(), title, cwd, model);
         id
     }
 
-    /// Réinsère une session existante au redémarrage. `started` = conversation déjà entamée
-    /// (le process sera relancé au 1er envoi avec `--resume`).
+    /// Réinsère une session existante au redémarrage (le process sera relancé au 1er envoi ;
+    /// la reprise `--resume` est décidée selon la présence du fichier de session sur disque).
     pub fn restore(
         &self,
         id: String,
         title: Option<String>,
-        started: bool,
+        _started: bool,
         cwd: Option<String>,
         model: Option<String>,
     ) {
-        self.insert(id, title, cwd, model, started);
+        self.insert(id, title, cwd, model);
     }
 
-    fn insert(
-        &self,
-        id: String,
-        title: Option<String>,
-        cwd: Option<String>,
-        model: Option<String>,
-        started: bool,
-    ) {
+    fn insert(&self, id: String, title: Option<String>, cwd: Option<String>, model: Option<String>) {
         let meta = SessionMeta {
             id: id.clone(),
             title: title.unwrap_or_else(|| "Claude".to_string()),
             cwd,
             model,
             proc: Arc::new(TokioMutex::new(None)),
-            started,
         };
         self.sessions.lock().unwrap().insert(id, meta);
-    }
-
-    /// Conversation déjà entamée pour cet id ? (→ `--resume`).
-    pub fn was_started(&self, id: &str) -> bool {
-        self.sessions
-            .lock()
-            .unwrap()
-            .get(id)
-            .map(|m| m.started)
-            .unwrap_or(false)
-    }
-
-    /// Marque la session comme entamée (après le 1er envoi).
-    pub fn mark_started(&self, id: &str) {
-        if let Some(m) = self.sessions.lock().unwrap().get_mut(id) {
-            m.started = true;
-        }
     }
 
     pub fn list(&self) -> Vec<SessionInfo> {
