@@ -24,6 +24,10 @@ export interface SessionState {
   priv: boolean;
   /** Messages tapés pendant que Claude travaille : envoyés l'un après l'autre. */
   queue: string[];
+  /** Début du tour en cours (ms) pour l'indicateur de réflexion ; null si inactif. */
+  turnStart: number | null;
+  /** Tokens de sortie cumulés du tour en cours. */
+  turnTokens: number;
 }
 
 export interface PersistedSession {
@@ -88,6 +92,8 @@ class SessionsStore {
       collapsed: false,
       priv: false,
       queue: [],
+      turnStart: null,
+      turnTokens: 0,
     };
     await this.attach(id);
     this.touch();
@@ -115,6 +121,8 @@ class SessionsStore {
         collapsed: p.collapsed ?? false,
         priv: p.priv ?? false,
         queue: [],
+        turnStart: null,
+        turnTokens: 0,
       };
       await this.attach(p.id);
     }
@@ -177,6 +185,8 @@ class SessionsStore {
     s.messages.push({ role: "user", text, tools: [] });
     // Le process est persistant : on écrit toujours, même si Claude travaille (pris en cours de route).
     s.streaming = true;
+    if (s.turnStart === null) s.turnStart = Date.now();
+    s.turnTokens = 0;
     this.touch();
     try {
       await ipc.sessionSend(id, text, s.model, s.effort);
@@ -227,6 +237,7 @@ class SessionsStore {
         // Nouveau tour → nouvelle bulle assistant (sauf si une bulle vide attend déjà).
         s.streaming = true;
         s.error = null;
+        if (s.turnStart === null) s.turnStart = Date.now();
         const last = s.messages[s.messages.length - 1];
         if (!(last && last.role === "assistant" && !last.text && last.tools.length === 0)) {
           s.messages.push({ role: "assistant", text: "", tools: [] });
@@ -239,10 +250,12 @@ class SessionsStore {
       case "tool_use":
         this.lastAssistant(s).tools.push(e.name);
         break;
-      case "tool_result":
+      case "progress":
+        s.turnTokens = e.output_tokens;
         break;
       case "turn_done":
         s.streaming = false;
+        s.turnStart = null;
         usage.refresh();
         this.touch();
         break;
@@ -261,6 +274,7 @@ class SessionsStore {
         break;
       case "exited":
         s.streaming = false;
+        s.turnStart = null;
         break;
     }
   }

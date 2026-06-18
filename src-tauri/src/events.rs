@@ -14,6 +14,8 @@ pub enum SessionEvent {
     AssistantDelta { text: String },
     /// L'assistant utilise un outil.
     ToolUse { name: String },
+    /// Progression du tour : tokens de sortie cumulés (pour l'indicateur live).
+    Progress { output_tokens: u64 },
     /// Fin du tour, avec compteurs de tokens si disponibles.
     TurnDone {
         input_tokens: u64,

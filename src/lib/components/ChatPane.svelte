@@ -64,6 +64,29 @@
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
   const efforts = $derived(session?.model === "opus" ? [...EFFORTS, ULTRACODE] : EFFORTS);
 
+  // Indicateur de réflexion (façon Claude Code) : spinner + secondes + tokens.
+  const FRAMES = ["✶", "✸", "✹", "✺", "✹", "✷"];
+  const VERBS = ["Réflexion", "Cogitation", "Mijotage", "Élucubration", "Tergiversation"];
+  let frame = $state(0);
+  let seconds = $state(0);
+  $effect(() => {
+    if (!session?.streaming) {
+      frame = 0;
+      seconds = 0;
+      return;
+    }
+    const start = session.turnStart ?? Date.now();
+    const iv = setInterval(() => {
+      frame = (frame + 1) % FRAMES.length;
+      seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    }, 130);
+    return () => clearInterval(iv);
+  });
+  const verb = $derived(VERBS[Math.floor(seconds / 4) % VERBS.length]);
+  function fmtTok(n: number): string {
+    return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+  }
+
   // Autoscroll vers le bas quand le contenu change (cap scroll : conteneur borné).
   $effect(() => {
     const msgs = session?.messages;
@@ -207,17 +230,22 @@
         {/if}
         {#if msg.text}
           <div class="bubble">{msg.text}</div>
-        {:else if msg.role === "assistant" && session.streaming}
-          <div class="bubble typing"><span></span><span></span><span></span></div>
         {/if}
       </div>
     {/each}
+    {#if session?.streaming}
+      <div class="thinking" in:fly={{ y: 4, duration: 140 }}>
+        <span class="spin">{FRAMES[frame]}</span>
+        <span class="verb">{verb}…</span>
+        <span class="tmeta">{seconds}s · ↑ {fmtTok(session.turnTokens)} tokens</span>
+      </div>
+    {/if}
     {#if session?.error}
       <div class="msg-error" in:fly={{ y: 6, duration: 160 }}>{session.error}</div>
     {/if}
   </div>
 
-  <div class="composer">
+  <div class="composer eff-{session?.effort ?? 'medium'}">
     <div class="meta">
       <Dropdown
         label="Modèle"
@@ -520,6 +548,60 @@
     border-top: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
+  }
+  /* Séparateur coloré selon l'effort (plus la puissance est haute, plus c'est marqué). */
+  .composer.eff-low {
+    border-top-color: var(--border);
+  }
+  .composer.eff-medium {
+    border-top-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+  }
+  .composer.eff-high {
+    border-top-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  }
+  .composer.eff-xhigh,
+  .composer.eff-max,
+  .composer.eff-ultracode {
+    border-top-color: transparent;
+    position: relative;
+  }
+  .composer.eff-xhigh::before,
+  .composer.eff-max::before,
+  .composer.eff-ultracode::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), #e6a988, var(--accent), #cf7ea6, var(--accent));
+    background-size: 300% 100%;
+    animation: effFlow 5s linear infinite;
+  }
+  .composer.eff-max::before,
+  .composer.eff-ultracode::before {
+    animation: effFlow 2.3s linear infinite;
+  }
+
+  /* Indicateur de réflexion façon Claude Code */
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 2px 0;
+  }
+  .spin {
+    color: var(--accent);
+    font-size: 13px;
+  }
+  .verb {
+    color: var(--text);
+  }
+  .tmeta {
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
   }
   .meta {
     display: flex;

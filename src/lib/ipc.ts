@@ -33,6 +33,7 @@ export type SessionEvent =
   | { kind: "assistant_delta"; text: string }
   | { kind: "tool_use"; name: string }
   | { kind: "tool_result"; ok: boolean }
+  | { kind: "progress"; output_tokens: number }
   | { kind: "turn_done"; input_tokens: number; output_tokens: number }
   | { kind: "error"; message: string }
   | { kind: "exited"; code: number | null };

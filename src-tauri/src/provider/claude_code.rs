@@ -202,6 +202,15 @@ fn handle_line(app: &tauri::AppHandle, id: &str, v: &Value) {
             };
             match ev.get("type").and_then(Value::as_str) {
                 Some("message_start") => emit(app, id, SessionEvent::AssistantStart),
+                Some("message_delta") => {
+                    if let Some(t) = ev
+                        .get("usage")
+                        .and_then(|u| u.get("output_tokens"))
+                        .and_then(Value::as_u64)
+                    {
+                        emit(app, id, SessionEvent::Progress { output_tokens: t });
+                    }
+                }
                 Some("content_block_delta") => {
                     let delta = ev.get("delta");
                     if delta.and_then(|d| d.get("type")).and_then(Value::as_str) == Some("text_delta")
