@@ -181,9 +181,10 @@
         {/if}
       </div>
 
+      <div class="divider"></div>
       <div class="tabs">
-        {#each tabs.list as t (t.id)}
-          <span class="tab-sep"></span>
+        {#each tabs.list as t, i (t.id)}
+          {#if i > 0}<span class="tab-sep"></span>{/if}
           <div class="tab" class:active={t.id === tabs.activeId}>
             {#if renamingTab === t.id}
               <input
@@ -215,11 +216,11 @@
             {/if}
           </div>
         {/each}
-        <span class="tab-sep"></span>
         <button class="tab-add" use:tooltip={"Nouvel onglet"} onclick={() => tabs.create()}>
           <Icon name="plus" size={14} />
         </button>
       </div>
+      <div class="divider"></div>
 
       <div class="spacer" data-tauri-drag-region></div>
       <UsageBars />
