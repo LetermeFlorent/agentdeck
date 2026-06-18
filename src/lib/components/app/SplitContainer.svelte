@@ -2,7 +2,7 @@
   import type { Node } from "$lib/stores/layout.svelte";
   import { layout } from "$lib/stores/layout.svelte";
   import { sessions } from "$lib/stores/sessions.svelte";
-  import ChatPane from "./ChatPane.svelte";
+  import ChatPane from "../chat/ChatPane.svelte";
   import Self from "./SplitContainer.svelte";
   import { scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -49,6 +49,7 @@
       sid={node.sid}
       nodeId={node.nodeId}
       canMinimize={parentDir === "row"}
+      canMove={parentDir !== undefined}
       onsplit={(dir) => layout.split(node.nodeId, dir)}
       onclose={() => layout.close(node.nodeId, node.sid)}
       onmove={(fromNodeId) => layout.swap(fromNodeId, node.nodeId)}

@@ -18,6 +18,31 @@ pub fn get_token() -> Option<String> {
     }
 }
 
+/// Vrai si Claude Code a déjà des credentials valides (connexion native via navigateur),
+/// même si agentdeck n'a pas de token dans son coffre. Dans ce cas, `claude` utilise ses
+/// propres credentials et on n'a pas besoin d'injecter de token.
+pub fn claude_logged_in() -> bool {
+    let mut p = match dirs::home_dir() {
+        Some(p) => p,
+        None => return false,
+    };
+    p.push(".claude");
+    p.push(".credentials.json");
+    let raw = match std::fs::read_to_string(p) {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+    serde_json::from_str::<serde_json::Value>(&raw)
+        .ok()
+        .and_then(|v| {
+            v.get("claudeAiOauth")
+                .and_then(|o| o.get("accessToken"))
+                .and_then(|x| x.as_str())
+                .map(|s| !s.is_empty())
+        })
+        .unwrap_or(false)
+}
+
 /// Stocke le token (écrase l'existant).
 pub fn set_token(token: &str) -> Result<(), String> {
     let token = token.trim();

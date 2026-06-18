@@ -7,6 +7,7 @@ interface Persisted {
   defaultModel: string | null;
   defaultEffort: string | null;
   unavailableModels: string[];
+  privateAfterMin: number | null;
 }
 
 class SettingsStore {
@@ -18,6 +19,8 @@ class SettingsStore {
   defaultEffort = $state<string | null>(null);
   /** Modèles détectés indisponibles (retirés des listes automatiquement). */
   unavailableModels = $state<string[]>([]);
+  /** Minutes d'inactivité avant passage auto en mode privé (0 / null = désactivé). */
+  privateAfterMin = $state<number | null>(null);
 
   load() {
     try {
@@ -28,6 +31,7 @@ class SettingsStore {
       this.defaultModel = p.defaultModel ?? null;
       this.defaultEffort = p.defaultEffort ?? null;
       this.unavailableModels = p.unavailableModels ?? [];
+      this.privateAfterMin = p.privateAfterMin ?? null;
     } catch {
       /* ignore */
     }
@@ -39,6 +43,7 @@ class SettingsStore {
       defaultModel: this.defaultModel,
       defaultEffort: this.defaultEffort,
       unavailableModels: this.unavailableModels,
+      privateAfterMin: this.privateAfterMin,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(p));
@@ -57,6 +62,11 @@ class SettingsStore {
   }
   setDefaultEffort(v: string) {
     this.defaultEffort = v || null;
+    this.save();
+  }
+  /** Délai d'inactivité (min) avant mode privé auto. <= 0 → désactivé (null). */
+  setPrivateAfterMin(v: number | null) {
+    this.privateAfterMin = v && v > 0 ? Math.round(v) : null;
     this.save();
   }
 

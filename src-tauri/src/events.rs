@@ -14,8 +14,10 @@ pub enum SessionEvent {
     AssistantStart,
     /// Fragment de texte de la réponse de l'assistant (streaming).
     AssistantDelta { text: String },
-    /// L'assistant utilise un outil.
-    ToolUse { name: String },
+    /// Fragment de réflexion (thinking) de l'assistant (streaming, affiché en mode terminal).
+    Thinking { text: String },
+    /// L'assistant utilise un outil : nom + résumé de l'entrée (commande, fichier…).
+    ToolUse { name: String, input: String },
     /// Progression du tour : tokens de sortie cumulés (pour l'indicateur live).
     Progress { output_tokens: u64 },
     /// Fin du tour : tokens du tour + coût cumulé (USD) + taille du contexte courant.

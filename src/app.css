@@ -8,6 +8,8 @@ html,
 body {
   margin: 0;
   height: 100%;
+  /* Pas de rebond élastique (overscroll) de la fenêtre. */
+  overscroll-behavior: none;
 }
 
 body {

@@ -2,6 +2,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
 
 export interface SessionInfo {
   id: string;
@@ -9,6 +10,12 @@ export interface SessionInfo {
   started: boolean;
   cwd: string | null;
   model: string | null;
+}
+
+/** Image jointe à un message : base64 brut (sans préfixe data:) + type MIME. */
+export interface ImageInput {
+  media_type: string;
+  data: string;
 }
 
 export interface Bar {
@@ -32,7 +39,8 @@ export type SessionEvent =
   | { kind: "init"; slash_commands: string[] }
   | { kind: "assistant_start" }
   | { kind: "assistant_delta"; text: string }
-  | { kind: "tool_use"; name: string }
+  | { kind: "thinking"; text: string }
+  | { kind: "tool_use"; name: string; input: string }
   | { kind: "tool_result"; ok: boolean }
   | { kind: "progress"; output_tokens: number }
   | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number; context_tokens: number; context_window: number }
@@ -74,7 +82,15 @@ export const sessionSend = (
   text: string,
   model?: string | null,
   effort?: string | null,
-) => invoke<void>("session_send", { id, text, model: model ?? null, effort: effort ?? null });
+  images?: ImageInput[],
+) =>
+  invoke<void>("session_send", {
+    id,
+    text,
+    model: model ?? null,
+    effort: effort ?? null,
+    images: images ?? [],
+  });
 export const sessionStop = (id: string) => invoke<void>("session_stop", { id });
 export const sessionClose = (id: string) => invoke<void>("session_close", { id });
 
@@ -94,7 +110,45 @@ export const checkClaude = () => invoke<boolean>("check_claude");
 export const installClaude = () => invoke<void>("install_claude");
 
 // ---- Commandes slash (liste dynamique) ----
-export const slashCommandsFetch = () => invoke<string[]>("slash_commands");
+export interface SlashCmd {
+  name: string;
+  description: string;
+  /** Indice d'arguments (ex. "[message]") — vide si aucun. */
+  args: string;
+}
+export const slashCommandsFetch = () => invoke<SlashCmd[]>("slash_commands");
+
+// ---- Nom d'utilisateur du PC (accueil démarrage) ----
+export const osUsername = () => invoke<string>("os_username");
+
+// ---- Fenêtre : faire clignoter l'icône dans la barre des tâches (attention) ----
+export const requestAttention = async () => {
+  try {
+    await getCurrentWindow().requestUserAttention(UserAttentionType.Critical);
+  } catch {
+    /* ignore (permission / plateforme) */
+  }
+};
+export const clearAttention = async () => {
+  try {
+    await getCurrentWindow().requestUserAttention(null);
+  } catch {
+    /* ignore */
+  }
+};
+
+// ---- Contrôles de fenêtre (titlebar custom) ----
+export const winMinimize = () => getCurrentWindow().minimize();
+export const winToggleMaximize = () => getCurrentWindow().toggleMaximize();
+export const winClose = () => getCurrentWindow().close();
+export const winToggleFullscreen = async () => {
+  const w = getCurrentWindow();
+  try {
+    await w.setFullscreen(!(await w.isFullscreen()));
+  } catch {
+    /* ignore */
+  }
+};
 
 // ---- Events ----
 export const onSessionEvent = (id: string, cb: (e: SessionEvent) => void): Promise<UnlistenFn> =>

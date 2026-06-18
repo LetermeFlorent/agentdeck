@@ -20,8 +20,20 @@
 
   let open = $state(false);
   let root: HTMLDivElement;
+  let btn = $state<HTMLButtonElement>();
+  // Menu en position fixe (échappe au `overflow:hidden` du pane) — calculé sur le bouton.
+  let menuStyle = $state("");
 
   const current = $derived(options.find((o) => o.v === value)?.l ?? label);
+
+  function toggle() {
+    open = !open;
+    if (open && btn) {
+      const r = btn.getBoundingClientRect();
+      const left = Math.max(6, Math.min(r.left, window.innerWidth - 142));
+      menuStyle = `left:${left}px; bottom:${window.innerHeight - r.top + 6}px;`;
+    }
+  }
 
   function pick(v: string) {
     onchange(v);
@@ -52,15 +64,16 @@
     class="dd-btn {btnClass}"
     class:open
     class:set={value !== ""}
+    bind:this={btn}
     use:tooltip={label}
-    onclick={() => (open = !open)}
+    onclick={toggle}
   >
     <span class="dd-cur">{current}</span>
     <span class="dd-chev" class:up={open}><Icon name="chevron" size={13} /></span>
   </button>
 
   {#if open}
-    <ul class="dd-list" transition:fly={{ y: 6, duration: 150, easing: cubicOut }}>
+    <ul class="dd-list" style={menuStyle} transition:fly={{ y: 6, duration: 150, easing: cubicOut }}>
       {#each options as o, i}
         <li in:fly={{ y: 5, duration: 130, delay: 20 + i * 22, easing: cubicOut }}>
           <button
@@ -87,7 +100,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    height: 22px;
+    height: 24px;
     padding: 0 4px 0 7px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
@@ -160,10 +173,10 @@
     transform: rotate(180deg);
   }
   .dd-list {
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 0;
+    position: fixed;
     min-width: 130px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
     list-style: none;
     margin: 0;
     padding: 5px;
@@ -171,7 +184,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
-    z-index: 40;
+    z-index: 1000;
   }
   .dd-item {
     width: 100%;

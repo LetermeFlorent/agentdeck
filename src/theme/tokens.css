@@ -36,21 +36,22 @@
 }
 
 :root[data-theme="light"] {
-  --bg: #faf9f6;
-  --surface: #faf9f6;
-  --surface-2: #f2f0ea;
+  /* Thème clair blanc neutre (façon Warp) — surfaces blanches, gris neutres, aucune teinte chaude. */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f6f6f7;
   --elevated: #ffffff;
-  --border: #e7e3da;
-  --border-strong: #d4cfc4;
-  --text: #232120;
-  --text-muted: #6e6860;
-  --text-faint: #a8a299;
+  --border: #e8e8ea;
+  --border-strong: #d6d6d9;
+  --text: #1c1c1e;
+  --text-muted: #6b6b70;
+  --text-faint: #a3a3a8;
   --accent: #bd5d3b;
   --accent-hover: #a94f30;
   --accent-weak: rgba(189, 93, 59, 0.1);
-  --good: #5e8a4d;
-  --warn: #b07f2c;
-  --danger: #bb4a3b;
-  --track: #ece8df;
-  --user-bubble: #f0ede6;
+  --good: #4f9d57;
+  --warn: #c08a2e;
+  --danger: #d2493b;
+  --track: #ededef;
+  --user-bubble: #f4f4f5;
 }

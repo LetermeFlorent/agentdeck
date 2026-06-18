@@ -1,29 +1,20 @@
 <script lang="ts">
   import { settings } from "$lib/stores/settings.svelte";
   import { sessions } from "$lib/stores/sessions.svelte";
-  import ThemeToggle from "./ThemeToggle.svelte";
-  import Dropdown from "./Dropdown.svelte";
-  import Icon from "./Icon.svelte";
+  import ThemeToggle from "../ui/ThemeToggle.svelte";
+  import Dropdown from "../ui/Dropdown.svelte";
+  import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
+  import { MODELS, EFFORTS, ULTRACODE } from "../chat/chat-config";
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
   let { onclose }: { onclose: () => void } = $props();
 
-  const MODELS = [
-    { v: "opus", l: "Opus" },
-    { v: "sonnet", l: "Sonnet" },
-    { v: "haiku", l: "Haiku" },
-    { v: "fable", l: "Fable" },
-  ];
-  const EFFORTS = [
-    { v: "low", l: "Low" },
-    { v: "medium", l: "Medium" },
-    { v: "high", l: "High" },
-    { v: "xhigh", l: "Xhigh" },
-    { v: "max", l: "Max" },
-  ];
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
+  // Même logique que la listbox du chat : l'effort dépend du modèle (ultracode exclusif Opus).
+  const selModel = $derived(settings.defaultModel ?? sessions.effModel);
+  const efforts = $derived(selModel === "opus" ? [...EFFORTS, ULTRACODE] : EFFORTS);
 </script>
 
 <div
@@ -73,11 +64,11 @@
     <div class="row">
       <div class="lbl">
         <span>Effort par défaut</span>
-        <span class="sub">low · medium · high · xhigh · max</span>
+        <span class="sub">{efforts.map((e) => e.v).join(" · ")}</span>
       </div>
       <Dropdown
         label="Effort"
-        options={EFFORTS}
+        options={efforts}
         value={settings.defaultEffort ?? sessions.effEffort ?? ""}
         onchange={(v) => settings.setDefaultEffort(v)}
       />
@@ -93,6 +84,36 @@
       </div>
       <span class="switch" class:on={settings.restoreOnLaunch}><span class="knob"></span></span>
     </button>
+
+    <div class="row">
+      <div class="lbl">
+        <span>Mode privé auto</span>
+        <span class="sub">Floute un chat après X min sans activité · 0 = jamais</span>
+      </div>
+      <div class="priv-ctl">
+        {#each [0, 5, 15, 30] as m}
+          <button
+            type="button"
+            class="chip"
+            class:on={(settings.privateAfterMin ?? 0) === m}
+            use:tooltip={m === 0 ? "Désactivé" : `Après ${m} min d'inactivité`}
+            onclick={() => settings.setPrivateAfterMin(m)}
+          >{m === 0 ? "Off" : `${m}m`}</button>
+        {/each}
+        <input
+          class="num"
+          type="number"
+          min="0"
+          max="240"
+          step="1"
+          aria-label="Délai personnalisé en minutes"
+          use:tooltip={"Délai personnalisé (minutes)"}
+          value={settings.privateAfterMin ?? 0}
+          oninput={(e) => settings.setPrivateAfterMin(+e.currentTarget.value)}
+        />
+        <span class="unit">min</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -190,5 +211,56 @@
   }
   .switch.on .knob {
     transform: translateX(17px);
+  }
+
+  /* Réglage mode privé auto : presets + temps custom */
+  .priv-ctl {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .chip {
+    min-width: 30px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    transition: border-color var(--transition), color var(--transition), background var(--transition);
+  }
+  .chip:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .chip.on {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-weak);
+  }
+  .num {
+    width: 50px;
+    height: 24px;
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-align: right;
+    outline: none;
+  }
+  .num:focus {
+    border-color: var(--accent);
+  }
+  .unit {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
   }
 </style>

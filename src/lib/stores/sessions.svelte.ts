@@ -6,10 +6,21 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
 
+export interface ToolCall {
+  name: string;
+  /** Résumé de l'entrée : commande, fichier, motif… (affichage terminal). */
+  input: string;
+}
+
 export interface Msg {
   role: "user" | "assistant";
   text: string;
-  tools: string[];
+  /** Réflexion (thinking) de l'assistant, streamée — affichée en mode terminal. */
+  thinking: string;
+  /** Outils appelés par l'assistant (nom + commande). */
+  toolCalls: ToolCall[];
+  /** Vignettes (data URLs) des images jointes à un message utilisateur — affichage seul. */
+  images?: string[];
 }
 
 export interface SessionState {
@@ -36,6 +47,10 @@ export interface SessionState {
   contextTokens: number;
   /** Fenêtre de contexte réelle du modèle (rapportée par Claude Code) ; 0 si inconnue. */
   contextWindow: number;
+  /** Dernière activité (ms) — sert au passage auto en mode privé après inactivité. */
+  lastActivity: number;
+  /** Zoom du chat (1 = 100%) — boutons +/− de l'entête. */
+  zoom: number;
 }
 
 export interface PersistedSession {
@@ -51,6 +66,7 @@ export interface PersistedSession {
   costUsd?: number;
   contextTokens?: number;
   contextWindow?: number;
+  zoom?: number;
 }
 
 class SessionsStore {
@@ -60,9 +76,11 @@ class SessionsStore {
   /** Modèle / effort par défaut (Claude Code courant), pour pré-remplir les nouveaux panes. */
   defaultModel = $state<string | null>(null);
   defaultEffort = $state<string | null>(null);
-  /** Commandes slash exposées par Claude Code (récupérées dynamiquement à l'init). */
-  slashCommands = $state<string[]>([]);
+  /** Commandes slash exposées par Claude Code (nom + description, récupérées dynamiquement). */
+  slashCommands = $state<ipc.SlashCmd[]>([]);
   private unlisteners: Record<string, UnlistenFn> = {};
+  private privacyTimer: number | null = null;
+  private slashFetched = false;
 
   private touch() {
     this.persistRev++;
@@ -88,21 +106,25 @@ class SessionsStore {
 
   /** Charge la liste des commandes slash (cache localStorage + fetch backend), pour le « / » immédiat. */
   async loadSlashCommands() {
-    if (this.slashCommands.length > 0) return;
-    try {
-      const cached = JSON.parse(localStorage.getItem("agentdeck.slash.v1") || "[]");
-      if (Array.isArray(cached) && cached.length) this.slashCommands = cached;
-    } catch {
-      /* ignore */
+    // Cache (instantané) pour l'affichage, puis fetch backend pour rafraîchir/compléter.
+    if (this.slashCommands.length === 0) {
+      try {
+        const cached = JSON.parse(localStorage.getItem("agentdeck.slash.v2") || "[]");
+        if (Array.isArray(cached) && cached.length) this.slashCommands = cached;
+      } catch {
+        /* ignore */
+      }
     }
+    if (this.slashFetched) return; // un seul fetch backend par session (spawn process)
+    this.slashFetched = true;
     try {
       const list = await ipc.slashCommandsFetch();
       if (list.length) {
         this.slashCommands = list;
-        localStorage.setItem("agentdeck.slash.v1", JSON.stringify(list));
+        localStorage.setItem("agentdeck.slash.v2", JSON.stringify(list));
       }
     } catch {
-      /* ignore */
+      this.slashFetched = false; // échec → autorise une nouvelle tentative
     }
   }
 
@@ -133,6 +155,8 @@ class SessionsStore {
       costUsd: 0,
       contextTokens: 0,
       contextWindow: 0,
+      lastActivity: Date.now(),
+      zoom: 1,
     };
     await this.attach(id);
     this.touch();
@@ -166,6 +190,8 @@ class SessionsStore {
         costUsd: p.costUsd ?? 0,
         contextTokens: p.contextTokens ?? 0,
         contextWindow: p.contextWindow ?? 0,
+        lastActivity: Date.now(),
+        zoom: p.zoom ?? 1,
       };
       await this.attach(p.id);
     }
@@ -177,13 +203,17 @@ class SessionsStore {
       title: s.title,
       model: s.model,
       effort: s.effort,
-      messages: s.messages,
+      // Quota localStorage : on ne persiste ni les data URLs d'images ni la réflexion (volumineuse).
+      messages: s.messages.map((m) =>
+        m.images?.length || m.thinking ? { ...m, images: undefined, thinking: "" } : m,
+      ),
       collapsed: s.collapsed,
       priv: s.priv,
       totalTokens: s.totalTokens,
       costUsd: s.costUsd,
       contextTokens: s.contextTokens,
       contextWindow: s.contextWindow,
+      zoom: s.zoom,
     }));
   }
 
@@ -192,6 +222,14 @@ class SessionsStore {
     const s = this.map[id];
     if (!s) return;
     s.collapsed = collapsed;
+    this.touch();
+  }
+
+  /** Zoom du chat : incrément (±0.1), borné à [0.6, 1.8]. */
+  setZoom(id: string, delta: number) {
+    const s = this.map[id];
+    if (!s) return;
+    s.zoom = Math.min(1.8, Math.max(0.6, Math.round((s.zoom + delta) * 10) / 10));
     this.touch();
   }
 
@@ -225,21 +263,68 @@ class SessionsStore {
     this.touch();
   }
 
-  async send(id: string, text: string) {
+  async send(
+    id: string,
+    text: string,
+    images: { dataUrl: string; media_type: string; data: string }[] = [],
+  ) {
     const s = this.map[id];
     if (!s) return;
     s.error = null;
-    s.messages.push({ role: "user", text, tools: [] });
+    s.messages.push({
+      role: "user",
+      text,
+      thinking: "",
+      toolCalls: [],
+      images: images.length ? images.map((i) => i.dataUrl) : undefined,
+    });
     // Le process est persistant : on écrit toujours, même si Claude travaille (pris en cours de route).
     s.streaming = true;
     if (s.turnStart === null) s.turnStart = Date.now();
     s.turnTokens = 0;
+    s.lastActivity = Date.now();
     this.touch();
     try {
-      await ipc.sessionSend(id, text, s.model, s.effort);
+      await ipc.sessionSend(
+        id,
+        text,
+        s.model,
+        s.effort,
+        images.map((i) => ({ media_type: i.media_type, data: i.data })),
+      );
     } catch (err) {
       s.error = String(err);
       s.streaming = false;
+    }
+  }
+
+  /** Marque une activité sur le chat (saisie, focus…) → repousse la veille privée. */
+  touchActivity(id: string) {
+    const s = this.map[id];
+    if (s) s.lastActivity = Date.now();
+  }
+
+  /** Surveille l'inactivité : passe un chat en mode privé après le délai réglé (Paramètres). */
+  startPrivacyWatch() {
+    if (this.privacyTimer !== null) return;
+    this.privacyTimer = window.setInterval(() => this.checkPrivacy(), 15_000);
+  }
+  stopPrivacyWatch() {
+    if (this.privacyTimer !== null) {
+      window.clearInterval(this.privacyTimer);
+      this.privacyTimer = null;
+    }
+  }
+  private checkPrivacy() {
+    const min = settings.privateAfterMin;
+    if (!min || min <= 0) return; // 0 / null = désactivé
+    const now = Date.now();
+    const ms = min * 60_000;
+    for (const s of Object.values(this.map)) {
+      if (!s.priv && !s.streaming && now - s.lastActivity > ms) {
+        s.priv = true;
+        this.touch();
+      }
     }
   }
 
@@ -267,7 +352,7 @@ class SessionsStore {
   private lastAssistant(s: SessionState): Msg {
     const last = s.messages[s.messages.length - 1];
     if (last && last.role === "assistant") return last;
-    const m: Msg = { role: "assistant", text: "", tools: [] };
+    const m: Msg = { role: "assistant", text: "", thinking: "", toolCalls: [] };
     s.messages.push(m);
     return m;
   }
@@ -282,11 +367,19 @@ class SessionsStore {
         break;
       case "init":
         if (e.slash_commands.length > 0) {
-          this.slashCommands = e.slash_commands;
-          try {
-            localStorage.setItem("agentdeck.slash.v1", JSON.stringify(e.slash_commands));
-          } catch {
-            /* ignore */
+          // Fusionne : garde les descriptions déjà connues, ajoute les noms manquants.
+          const have = new Set(this.slashCommands.map((c) => c.name));
+          const merged = [...this.slashCommands];
+          for (const n of e.slash_commands) {
+            if (!have.has(n)) merged.push({ name: n, description: "", args: "" });
+          }
+          if (merged.length !== this.slashCommands.length) {
+            this.slashCommands = merged;
+            try {
+              localStorage.setItem("agentdeck.slash.v2", JSON.stringify(merged));
+            } catch {
+              /* ignore */
+            }
           }
         }
         break;
@@ -296,16 +389,21 @@ class SessionsStore {
         s.error = null;
         if (s.turnStart === null) s.turnStart = Date.now();
         const last = s.messages[s.messages.length - 1];
-        if (!(last && last.role === "assistant" && !last.text && last.tools.length === 0)) {
-          s.messages.push({ role: "assistant", text: "", tools: [] });
+        const emptyAssistant =
+          last && last.role === "assistant" && !last.text && !last.thinking && last.toolCalls.length === 0;
+        if (!emptyAssistant) {
+          s.messages.push({ role: "assistant", text: "", thinking: "", toolCalls: [] });
         }
         break;
       }
       case "assistant_delta":
         this.lastAssistant(s).text += e.text;
         break;
+      case "thinking":
+        this.lastAssistant(s).thinking += e.text;
+        break;
       case "tool_use":
-        this.lastAssistant(s).tools.push(e.name);
+        this.lastAssistant(s).toolCalls.push({ name: e.name, input: e.input });
         break;
       case "progress":
         s.turnTokens = e.output_tokens;
@@ -313,6 +411,7 @@ class SessionsStore {
       case "turn_done":
         s.streaming = false;
         s.turnStart = null;
+        s.lastActivity = Date.now(); // fin de réponse → départ du compteur d'inactivité
         s.totalTokens += e.total_tokens;
         // Remplissage du contexte = prompt du dernier tour (remplace, pas de cumul).
         s.contextTokens = e.context_tokens;
@@ -322,6 +421,8 @@ class SessionsStore {
         if (e.cost_usd >= s.costUsd || e.cost_usd === 0) s.costUsd = e.cost_usd || s.costUsd;
         else s.costUsd = e.cost_usd; // process relancé (modèle changé) → réinitialisé
         usage.refresh();
+        // Chat fini pendant que la fenêtre n'a pas le focus → clignote la barre des tâches.
+        if (typeof document !== "undefined" && !document.hasFocus()) ipc.requestAttention();
         this.touch();
         break;
       case "error":

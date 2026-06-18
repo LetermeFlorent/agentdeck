@@ -45,9 +45,7 @@
       </div>
       <span class="pct">{s.week.pct}%</span>
     </div>
-    {#if real}
-      <span class="src real" use:tooltip={"Vraies limites d'abonnement (5h / 7j) via l'endpoint OAuth Claude."}>réel</span>
-    {:else}
+    {#if !real}
       <span class="src" use:tooltip={"Pas de donnée réelle dispo — estimation locale des tokens consommés via l'app."}>estimé</span>
     {/if}
   {/if}
@@ -96,10 +94,5 @@
     border-radius: 4px;
     padding: 1px 5px;
     cursor: help;
-  }
-  .src.real {
-    color: var(--accent);
-    border-color: var(--accent-weak);
-    background: var(--accent-weak);
   }
 </style>

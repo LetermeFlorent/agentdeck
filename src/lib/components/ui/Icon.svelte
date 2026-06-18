@@ -26,6 +26,14 @@
     <path d="M12 20V5M5.5 11.5 12 5l6.5 6.5" />
   {:else if name === "plus"}
     <path d="M12 5v14M5 12h14" />
+  {:else if name === "minus"}
+    <path d="M5 12h14" />
+  {:else if name === "win-min"}
+    <path d="M5 12h14" />
+  {:else if name === "win-max"}
+    <rect x="5" y="5" width="14" height="14" rx="2" />
+  {:else if name === "win-close"}
+    <path d="M6 6l12 12M18 6 6 18" />
   {:else if name === "split-h"}
     <!-- deux colonnes côte à côte -->
     <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -69,6 +77,10 @@
     <path d="M6 9l6 6 6-6" />
   {:else if name === "check"}
     <path d="M5 12l4.5 4.5L19 7" />
+  {:else if name === "image"}
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="8.5" cy="9" r="1.6" />
+    <path d="M21 16l-5-5L5 20" />
   {:else if name === "grip"}
     <g fill="currentColor" stroke="none">
       <circle cx="9" cy="6" r="1.4" />

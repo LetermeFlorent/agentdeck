@@ -7,11 +7,13 @@
   import { sessions } from "$lib/stores/sessions.svelte";
   import * as persist from "$lib/stores/persist";
   import { settings } from "$lib/stores/settings.svelte";
-  import Onboarding from "$lib/components/Onboarding.svelte";
-  import SplitContainer from "$lib/components/SplitContainer.svelte";
-  import UsageBars from "$lib/components/UsageBars.svelte";
-  import SettingsModal from "$lib/components/SettingsModal.svelte";
-  import Icon from "$lib/components/Icon.svelte";
+  import Onboarding from "$lib/components/app/Onboarding.svelte";
+  import BootLoader from "$lib/components/app/BootLoader.svelte";
+  import SplitContainer from "$lib/components/app/SplitContainer.svelte";
+  import WindowControls from "$lib/components/ui/WindowControls.svelte";
+  import UsageBars from "$lib/components/ui/UsageBars.svelte";
+  import SettingsModal from "$lib/components/app/SettingsModal.svelte";
+  import Icon from "$lib/components/ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import * as ipc from "$lib/ipc";
 
@@ -22,10 +24,16 @@
   let installing = $state(false);
   let installErr = $state<string | null>(null);
   let showSettings = $state(false);
+  let username = $state("");
 
   onMount(async () => {
     theme.init();
     settings.load();
+    try {
+      username = await ipc.osUsername();
+    } catch {
+      /* ignore */
+    }
     try {
       claudeReady = await ipc.checkClaude();
     } catch {
@@ -37,6 +45,15 @@
     } catch {
       /* ignore */
     }
+    // Clic sur l'icône de la barre des tâches → fenêtre au 1er plan → on stoppe le clignotement.
+    window.addEventListener("focus", () => ipc.clearAttention());
+    // F11 : bascule plein écran (la déco OS est désactivée, donc on le gère nous-mêmes).
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "F11") {
+        e.preventDefault();
+        ipc.winToggleFullscreen();
+      }
+    });
   });
 
   async function installClaude() {
@@ -63,6 +80,7 @@
   });
 
   async function bootDeck() {
+    const t0 = Date.now();
     await sessions.loadDefaults();
     sessions.loadSlashCommands(); // pré-charge la liste des commandes "/" (cache + fetch)
     const saved = settings.restoreOnLaunch ? persist.load() : null;
@@ -72,7 +90,11 @@
     } else {
       await layout.init();
     }
+    // Loader visible au moins 3 s (minimum, pas maximum).
+    const wait = 3000 - (Date.now() - t0);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     booted = true;
+    sessions.startPrivacyWatch(); // veille : passage auto en mode privé après inactivité
   }
 
   // Sauvegarde automatique à chaque changement (après le boot, pour ne pas écraser l'état restauré).
@@ -85,6 +107,7 @@
 
   async function logout() {
     usage.stop();
+    sessions.stopPrivacyWatch();
     persist.clear();
     await auth.logout();
     layout.root = null;
@@ -93,8 +116,11 @@
   }
 </script>
 
+{#if !(auth.connected && booted)}
+  <WindowControls />
+{/if}
 {#if claudeReady === false}
-  <div class="wrap">
+  <div class="wrap" data-tauri-drag-region>
     <div class="dep">
       <div class="dep-ic"><Icon name="terminal" size={26} stroke={1.6} /></div>
       <h1>Claude Code requis</h1>
@@ -106,16 +132,19 @@
     </div>
   </div>
 {:else if auth.checking || claudeReady === null}
-  <div class="boot">
+  <div class="boot" data-tauri-drag-region>
     <div class="boot-dot"></div>
     <span>agentdeck</span>
   </div>
 {:else if !auth.connected}
   <Onboarding />
+{:else if !booted}
+  <BootLoader {username} />
 {:else}
   <div class="app">
-    <header class="topbar">
-      <div class="brand">
+    <!-- Titlebar custom : barre app + contrôles système fusionnés (déco OS désactivée). -->
+    <header class="topbar" data-tauri-drag-region>
+      <div class="brand" data-tauri-drag-region>
         <div class="dot"></div>
         <span class="logo">agentdeck</span>
         {#if plan.label}
@@ -124,7 +153,7 @@
           </span>
         {/if}
       </div>
-      <div class="spacer"></div>
+      <div class="spacer" data-tauri-drag-region></div>
       <UsageBars />
       <div class="divider"></div>
       <button class="icon-btn" use:tooltip={"Paramètres"} onclick={() => (showSettings = true)}>
@@ -133,6 +162,18 @@
       <button class="icon-btn" use:tooltip={"Se déconnecter"} onclick={logout}>
         <Icon name="logout" size={16} />
       </button>
+      <div class="wsep"></div>
+      <div class="wctl">
+        <button class="wbtn" use:tooltip={"Réduire"} onclick={() => ipc.winMinimize()}>
+          <Icon name="win-min" size={14} />
+        </button>
+        <button class="wbtn" use:tooltip={"Agrandir / restaurer"} onclick={() => ipc.winToggleMaximize()}>
+          <Icon name="win-max" size={12} />
+        </button>
+        <button class="wbtn close" use:tooltip={"Fermer"} onclick={() => ipc.winClose()}>
+          <Icon name="win-close" size={14} />
+        </button>
+      </div>
     </header>
 
     <main class="deck">
@@ -225,15 +266,15 @@
   .topbar {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 4px 14px;
+    gap: 10px;
+    padding: 2px 12px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
   .topbar :global(.icon-btn) {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
   .brand {
     display: flex;
@@ -263,29 +304,29 @@
     border: 1px solid transparent;
   }
   .plan-1 {
-    font-size: 10px;
-    padding: 3px 6px;
+    font-size: 9px;
+    padding: 2px 5px;
     color: var(--text-muted);
     background: var(--surface-2);
     border-color: var(--border);
   }
   .plan-2 {
-    font-size: 10.5px;
-    padding: 3px 7px;
+    font-size: 9px;
+    padding: 2px 5px;
     color: var(--accent);
     background: var(--accent-weak);
     border-color: color-mix(in srgb, var(--accent) 30%, transparent);
   }
   .plan-3 {
-    font-size: 11.5px;
-    padding: 3px 8px;
+    font-size: 9.5px;
+    padding: 2px 6px;
     color: #fff;
     background: linear-gradient(120deg, var(--accent), var(--accent-hover));
     box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 40%, transparent);
   }
   .plan-4 {
-    font-size: 13px;
-    padding: 4px 10px;
+    font-size: 10.5px;
+    padding: 2px 7px;
     color: #fff;
     background: linear-gradient(120deg, #e0825f, var(--accent) 45%, #b94f9e);
     background-size: 200% 100%;
@@ -310,9 +351,40 @@
     height: 22px;
     background: var(--border);
   }
+  /* Contrôles de fenêtre (réduire / agrandir / fermer) */
+  .wsep {
+    width: 1px;
+    height: 22px;
+    background: var(--border);
+    margin-left: 4px;
+  }
+  .wctl {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    /* Colle les contrôles au coin haut-droit (annule le padding droit de la barre). */
+    margin: -2px -12px -2px 2px;
+    align-self: stretch;
+  }
+  .wbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    color: var(--text-muted);
+    transition: background var(--transition), color var(--transition);
+  }
+  .wbtn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .wbtn.close:hover {
+    background: var(--danger);
+    color: #fff;
+  }
   .deck {
     flex: 1;
-    padding: var(--pane-gap);
+    padding: 0;
     min-height: 0;
     overflow: hidden;
   }

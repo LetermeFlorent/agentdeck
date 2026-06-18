@@ -18,11 +18,11 @@ function apply(choice: ThemeChoice) {
 }
 
 class ThemeStore {
-  choice = $state<ThemeChoice>("system");
+  choice = $state<ThemeChoice>("light");
 
   init() {
     const saved = localStorage.getItem(KEY) as ThemeChoice | null;
-    this.choice = saved ?? "system";
+    this.choice = saved ?? "light";
     apply(this.choice);
     // Suivre le système quand le choix est "system".
     window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", () => {
