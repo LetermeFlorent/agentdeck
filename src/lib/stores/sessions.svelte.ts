@@ -175,29 +175,14 @@ class SessionsStore {
     if (!s) return;
     s.error = null;
     s.messages.push({ role: "user", text, tools: [] });
+    // Le process est persistant : on écrit toujours, même si Claude travaille (pris en cours de route).
+    s.streaming = true;
     this.touch();
-    // Claude travaille déjà → on met en file (1 process/tour : on n'en lance pas un 2e).
-    if (s.streaming || s.queue.length > 0) {
-      s.queue.push(text);
-      return;
-    }
     try {
       await ipc.sessionSend(id, text, s.model, s.effort);
     } catch (err) {
       s.error = String(err);
-    }
-  }
-
-  /** Envoie le prochain message en file, une fois le tour précédent terminé. */
-  private async drain(id: string) {
-    const s = this.map[id];
-    if (!s || s.streaming || s.queue.length === 0) return;
-    const next = s.queue.shift()!;
-    this.touch();
-    try {
-      await ipc.sessionSend(id, next, s.model, s.effort);
-    } catch (err) {
-      s.error = String(err);
+      s.streaming = false;
     }
   }
 
@@ -235,10 +220,19 @@ class SessionsStore {
     if (!s) return;
     switch (e.kind) {
       case "started":
+        // Process prêt (pas une nouvelle bulle).
+        s.error = null;
+        break;
+      case "assistant_start": {
+        // Nouveau tour → nouvelle bulle assistant (sauf si une bulle vide attend déjà).
         s.streaming = true;
         s.error = null;
-        s.messages.push({ role: "assistant", text: "", tools: [] });
+        const last = s.messages[s.messages.length - 1];
+        if (!(last && last.role === "assistant" && !last.text && last.tools.length === 0)) {
+          s.messages.push({ role: "assistant", text: "", tools: [] });
+        }
         break;
+      }
       case "assistant_delta":
         this.lastAssistant(s).text += e.text;
         break;
@@ -267,8 +261,6 @@ class SessionsStore {
         break;
       case "exited":
         s.streaming = false;
-        // Tour terminé → on envoie le message suivant en file s'il y en a.
-        this.drain(id);
         break;
     }
   }

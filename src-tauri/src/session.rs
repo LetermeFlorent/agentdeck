@@ -1,30 +1,37 @@
-// Gestion des sessions : une session = une conversation Claude Code identifiée par un UUID
-// (réutilisé comme --session-id / --resume). Chaque session garde un handle sur le process
-// du tour en cours pour pouvoir l'arrêter.
+// Gestion des sessions. Chaque session = une conversation Claude pilotée par UN process
+// `claude` persistant (entrée stream-json) : on écrit les messages sur son stdin, même
+// pendant qu'il travaille (steering / envoi en cours de route), comme l'app interactive.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
+use tokio::process::{Child, ChildStdin};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
 
-use crate::provider::SharedChild;
+/// Process persistant d'une session + son stdin (pour injecter les messages).
+pub struct SessionProc {
+    pub child: Child,
+    pub stdin: ChildStdin,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+}
+
+pub type SharedProc = Arc<TokioMutex<Option<SessionProc>>>;
 
 pub struct SessionMeta {
     pub id: String,
     pub title: String,
-    pub started: bool,
     pub cwd: Option<String>,
     pub model: Option<String>,
-    pub running: SharedChild,
+    pub proc: SharedProc,
 }
 
 #[derive(Serialize, Clone)]
 pub struct SessionInfo {
     pub id: String,
     pub title: String,
-    pub started: bool,
     pub cwd: Option<String>,
     pub model: Option<String>,
 }
@@ -34,46 +41,32 @@ pub struct SessionManager {
     sessions: Mutex<HashMap<String, SessionMeta>>,
 }
 
-/// Données nécessaires pour lancer un tour (extraites sous lock, utilisées hors lock).
-pub struct TurnHandles {
-    pub started: bool,
-    pub cwd: Option<String>,
-    pub model: Option<String>,
-    pub running: SharedChild,
-}
-
 impl SessionManager {
     pub fn create(&self, title: Option<String>, cwd: Option<String>, model: Option<String>) -> String {
         let id = Uuid::new_v4().to_string();
-        let meta = SessionMeta {
-            id: id.clone(),
-            title: title.unwrap_or_else(|| "Claude".to_string()),
-            started: false,
-            cwd,
-            model,
-            running: Arc::new(TokioMutex::new(None)),
-        };
-        self.sessions.lock().unwrap().insert(id.clone(), meta);
+        self.insert(id.clone(), title, cwd, model);
         id
     }
 
-    /// Réinsère une session existante (au redémarrage de l'app). L'UUID est conservé
-    /// pour pouvoir reprendre la conversation Claude via --resume.
+    /// Réinsère une session existante au redémarrage (le process sera relancé au 1er envoi).
     pub fn restore(
         &self,
         id: String,
         title: Option<String>,
-        started: bool,
+        _started: bool,
         cwd: Option<String>,
         model: Option<String>,
     ) {
+        self.insert(id, title, cwd, model);
+    }
+
+    fn insert(&self, id: String, title: Option<String>, cwd: Option<String>, model: Option<String>) {
         let meta = SessionMeta {
             id: id.clone(),
             title: title.unwrap_or_else(|| "Claude".to_string()),
-            started,
             cwd,
             model,
-            running: Arc::new(TokioMutex::new(None)),
+            proc: Arc::new(TokioMutex::new(None)),
         };
         self.sessions.lock().unwrap().insert(id, meta);
     }
@@ -85,7 +78,6 @@ impl SessionManager {
             .map(|m| SessionInfo {
                 id: m.id.clone(),
                 title: m.title.clone(),
-                started: m.started,
                 cwd: m.cwd.clone(),
                 model: m.model.clone(),
             })
@@ -94,27 +86,20 @@ impl SessionManager {
         v
     }
 
-    /// Récupère les handles d'un tour et marque la session comme démarrée.
-    pub fn begin_turn(&self, id: &str) -> Option<TurnHandles> {
-        let mut map = self.sessions.lock().unwrap();
-        let meta = map.get_mut(id)?;
-        let h = TurnHandles {
-            started: meta.started,
-            cwd: meta.cwd.clone(),
-            model: meta.model.clone(),
-            running: meta.running.clone(),
-        };
-        meta.started = true;
-        Some(h)
-    }
-
-    pub fn running_handle(&self, id: &str) -> Option<SharedChild> {
+    /// Contexte d'envoi : (handle process partagé, cwd) si la session existe.
+    pub fn send_ctx(&self, id: &str) -> Option<(SharedProc, Option<String>)> {
         let map = self.sessions.lock().unwrap();
-        map.get(id).map(|m| m.running.clone())
+        let m = map.get(id)?;
+        Some((m.proc.clone(), m.cwd.clone()))
     }
 
-    pub fn remove(&self, id: &str) -> Option<SharedChild> {
+    pub fn proc_handle(&self, id: &str) -> Option<SharedProc> {
+        let map = self.sessions.lock().unwrap();
+        map.get(id).map(|m| m.proc.clone())
+    }
+
+    pub fn remove(&self, id: &str) -> Option<SharedProc> {
         let mut map = self.sessions.lock().unwrap();
-        map.remove(id).map(|m| m.running)
+        map.remove(id).map(|m| m.proc)
     }
 }

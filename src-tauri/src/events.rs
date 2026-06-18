@@ -6,14 +6,14 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionEvent {
-    /// Le tour a démarré (process lancé / init reçu).
+    /// Le process de session est prêt (init reçu).
     Started,
+    /// Début d'un nouveau message assistant (nouveau tour, nouvelle bulle).
+    AssistantStart,
     /// Fragment de texte de la réponse de l'assistant (streaming).
     AssistantDelta { text: String },
     /// L'assistant utilise un outil.
     ToolUse { name: String },
-    /// Résultat d'un outil (résumé court).
-    ToolResult { ok: bool },
     /// Fin du tour, avec compteurs de tokens si disponibles.
     TurnDone {
         input_tokens: u64,

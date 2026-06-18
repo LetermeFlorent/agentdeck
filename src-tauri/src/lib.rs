@@ -7,7 +7,6 @@ mod provider;
 mod session;
 mod usage;
 
-use provider::{ClaudeCodeProvider, Provider, TurnConfig};
 use session::{SessionInfo, SessionManager};
 use usage::{UsageSnapshot, UsageStore};
 
@@ -146,47 +145,35 @@ fn session_send(
     effort: Option<String>,
 ) -> Result<(), String> {
     let token = auth::get_token().ok_or_else(|| "Non connecté (aucun token).".to_string())?;
-    let handles = mgr
-        .begin_turn(&id)
+    let (proc, cwd) = mgr
+        .send_ctx(&id)
         .ok_or_else(|| "Session inconnue.".to_string())?;
-
-    let cfg = TurnConfig {
-        id: id.clone(),
-        prompt: text,
-        resume: handles.started,
-        cwd: handles.cwd,
-        // Choix du pane (modèle/effort) prioritaire ; repli sur la config de session.
-        model: model.or(handles.model),
-        effort,
-        token,
-    };
-    ClaudeCodeProvider.start_turn(app, cfg, handles.running);
+    // Écrit le message sur le stdin du process persistant (pris en cours de route si Claude bosse).
+    tauri::async_runtime::spawn(provider::claude_code::send(
+        app, id, proc, cwd, model, effort, token, text,
+    ));
     Ok(())
 }
 
 #[tauri::command]
-async fn session_stop(
-    mgr: tauri::State<'_, SessionManager>,
-    id: String,
-) -> Result<(), String> {
-    if let Some(running) = mgr.running_handle(&id) {
-        let mut slot = running.lock().await;
-        if let Some(child) = slot.as_mut() {
-            let _ = child.start_kill();
+async fn session_stop(mgr: tauri::State<'_, SessionManager>, id: String) -> Result<(), String> {
+    if let Some(proc) = mgr.proc_handle(&id) {
+        let mut slot = proc.lock().await;
+        if let Some(p) = slot.take() {
+            let mut c = p.child;
+            let _ = c.start_kill();
         }
     }
     Ok(())
 }
 
 #[tauri::command]
-async fn session_close(
-    mgr: tauri::State<'_, SessionManager>,
-    id: String,
-) -> Result<(), String> {
-    if let Some(running) = mgr.remove(&id) {
-        let mut slot = running.lock().await;
-        if let Some(child) = slot.as_mut() {
-            let _ = child.start_kill();
+async fn session_close(mgr: tauri::State<'_, SessionManager>, id: String) -> Result<(), String> {
+    if let Some(proc) = mgr.remove(&id) {
+        let mut slot = proc.lock().await;
+        if let Some(p) = slot.take() {
+            let mut c = p.child;
+            let _ = c.start_kill();
         }
     }
     Ok(())

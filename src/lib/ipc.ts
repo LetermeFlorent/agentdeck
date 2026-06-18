@@ -29,6 +29,7 @@ export interface UsageSnapshot {
 // Events émis par le backend sur session://{id} (tag "kind", snake_case).
 export type SessionEvent =
   | { kind: "started" }
+  | { kind: "assistant_start" }
   | { kind: "assistant_delta"; text: string }
   | { kind: "tool_use"; name: string }
   | { kind: "tool_result"; ok: boolean }

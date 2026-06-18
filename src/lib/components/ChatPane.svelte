@@ -246,7 +246,7 @@
         class="send"
         type="submit"
         disabled={!draft.trim()}
-        use:tooltip={session?.streaming ? "Mettre en file (Claude travaille)" : "Envoyer (Entrée)"}
+        use:tooltip={session?.streaming ? "Envoyer (pris en cours de route)" : "Envoyer (Entrée)"}
       ><Icon name="send" size={15} /></button>
     </form>
   </div>
