@@ -1,6 +1,7 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
   import Icon from "./Icon.svelte";
+  import Dropdown from "./Dropdown.svelte";
   import { fly } from "svelte/transition";
 
   let {
@@ -24,14 +25,14 @@
   const session = $derived(sessions.map[sid]);
 
   const MODELS = [
-    { v: "", l: "Modèle" },
+    { v: "", l: "Défaut" },
     { v: "opus", l: "Opus" },
     { v: "sonnet", l: "Sonnet" },
     { v: "haiku", l: "Haiku" },
     { v: "fable", l: "Fable" },
   ];
   const EFFORTS = [
-    { v: "", l: "Effort" },
+    { v: "", l: "Défaut" },
     { v: "low", l: "Low" },
     { v: "medium", l: "Medium" },
     { v: "high", l: "High" },
@@ -144,36 +145,36 @@
     {/if}
   </div>
 
-  <form class="composer" onsubmit={submit}>
-    <select
-      class="sel"
-      title="Modèle"
-      value={session?.model ?? ""}
-      onchange={(e) => sessions.setModel(sid, e.currentTarget.value)}
-    >
-      {#each MODELS as m}<option value={m.v}>{m.l}</option>{/each}
-    </select>
-    <select
-      class="sel"
-      title="Effort de raisonnement"
-      value={session?.effort ?? ""}
-      onchange={(e) => sessions.setEffort(sid, e.currentTarget.value)}
-    >
-      {#each EFFORTS as ef}<option value={ef.v}>{ef.l}</option>{/each}
-    </select>
-    <textarea
-      placeholder="Message à Claude…  (Entrée pour envoyer)"
-      bind:value={draft}
-      onkeydown={onKey}
-      rows="1"
-    ></textarea>
-    <button
-      class="btn btn-accent send"
-      type="submit"
-      disabled={!draft.trim() || session?.streaming}
-      title="Envoyer"
-    ><Icon name="send" size={16} /></button>
-  </form>
+  <div class="composer">
+    <div class="meta">
+      <Dropdown
+        label="Modèle"
+        options={MODELS}
+        value={session?.model ?? ""}
+        onchange={(v) => sessions.setModel(sid, v)}
+      />
+      <Dropdown
+        label="Effort"
+        options={EFFORTS}
+        value={session?.effort ?? ""}
+        onchange={(v) => sessions.setEffort(sid, v)}
+      />
+    </div>
+    <form class="field" onsubmit={submit}>
+      <textarea
+        placeholder="Message à Claude…"
+        bind:value={draft}
+        onkeydown={onKey}
+        rows="1"
+      ></textarea>
+      <button
+        class="send"
+        type="submit"
+        disabled={!draft.trim() || session?.streaming}
+        title="Envoyer (Entrée)"
+      ><Icon name="send" size={15} /></button>
+    </form>
+  </div>
 </div>
 
 <style>
@@ -360,67 +361,73 @@
     white-space: pre-wrap;
   }
 
-  /* Composer (–15%) : modèle, effort, saisie et envoi sur une seule ligne */
+  /* Composer minimaliste : barre unique collée au bord. Modèle/effort (dropdowns custom)
+     + saisie + envoi sur une seule ligne. */
   .composer {
     display: flex;
     align-items: flex-end;
     gap: 6px;
-    padding: 6px;
+    padding: 6px 7px;
     border-top: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
   }
-  .sel {
-    appearance: none;
+  .meta {
+    display: flex;
+    gap: 5px;
     flex-shrink: 0;
-    height: 28px;
+  }
+  .field {
+    flex: 1;
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    min-width: 0;
+    padding: 3px 3px 3px 4px;
     background: var(--bg);
     border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    padding: 0 8px;
-    border-radius: var(--radius-sm);
-    outline: none;
-    cursor: pointer;
-    transition: border-color var(--transition), color var(--transition);
+    border-radius: var(--radius);
+    transition: border-color var(--transition);
   }
-  .sel:hover {
-    border-color: var(--border-strong);
-    color: var(--text);
-  }
-  .sel:focus {
+  .field:focus-within {
     border-color: var(--accent);
   }
   textarea {
     flex: 1;
     resize: none;
     max-height: 110px;
-    padding: 5px 9px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border);
-    background: var(--bg);
+    padding: 5px 6px;
+    border: none;
+    background: transparent;
+    color: var(--text);
     font-size: 12.5px;
     line-height: 1.35;
     outline: none;
-    transition: border-color var(--transition);
+    min-width: 0;
   }
-  textarea:focus {
-    border-color: var(--accent);
+  textarea::placeholder {
+    color: var(--text-faint);
   }
   .send {
-    width: 33px;
-    height: 33px;
-    padding: 0;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    width: 30px;
+    height: 28px;
     flex-shrink: 0;
-    transition: background var(--transition), transform var(--transition);
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    transition: background var(--transition), transform var(--transition), opacity var(--transition);
+  }
+  .send:not(:disabled):hover {
+    background: var(--accent-hover);
   }
   .send:not(:disabled):active {
-    transform: scale(0.92);
+    transform: scale(0.9);
   }
   .send:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: default;
   }
 </style>

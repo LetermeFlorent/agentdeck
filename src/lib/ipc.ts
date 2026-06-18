@@ -78,6 +78,10 @@ export const sessionClose = (id: string) => invoke<void>("session_close", { id }
 // ---- Usage ----
 export const usageGet = () => invoke<UsageSnapshot>("usage_get");
 
+// ---- Défauts modèle/effort (Claude Code courant) ----
+export const claudeDefaults = () =>
+  invoke<{ model: string; effort: string }>("claude_defaults");
+
 // ---- Events ----
 export const onSessionEvent = (id: string, cb: (e: SessionEvent) => void): Promise<UnlistenFn> =>
   listen<SessionEvent>(`session://${id}`, (evt) => cb(evt.payload));

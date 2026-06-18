@@ -165,12 +165,62 @@ fn usage_get(store: tauri::State<'_, UsageStore>) -> UsageSnapshot {
     usage::snapshot(&store)
 }
 
+/// Modèle / effort par défaut pour un nouveau pane : on récupère ceux du Claude Code
+/// courant (cache statusline) ; sinon valeurs par défaut (Opus / medium).
+#[tauri::command]
+fn claude_defaults() -> serde_json::Value {
+    let read = || -> Option<(String, String)> {
+        let mut p = dirs::home_dir()?;
+        p.push(".cache");
+        p.push("claude-statusbar");
+        p.push("last_stdin.json");
+        let raw = std::fs::read_to_string(p).ok()?;
+        let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let model_id = v
+            .get("model")
+            .and_then(|m| m.get("id"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("");
+        let alias = if model_id.contains("opus") {
+            "opus"
+        } else if model_id.contains("sonnet") {
+            "sonnet"
+        } else if model_id.contains("haiku") {
+            "haiku"
+        } else if model_id.contains("fable") {
+            "fable"
+        } else {
+            ""
+        };
+        let effort = v
+            .get("effort")
+            .and_then(|e| e.get("level"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("");
+        Some((alias.to_string(), effort.to_string()))
+    };
+    let (mut model, mut effort) = read().unwrap_or_default();
+    if model.is_empty() {
+        model = "opus".into();
+    }
+    if effort.is_empty() {
+        effort = "medium".into();
+    }
+    serde_json::json!({ "model": model, "effort": effort })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(SessionManager::default())
         .manage(UsageStore::load())
+        .setup(|app| {
+            // Poller de fond : vrai usage d'abonnement via l'endpoint OAuth.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(usage::run_poller(handle));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             auth_status,
             auth_set_token,
@@ -184,6 +234,7 @@ pub fn run() {
             session_stop,
             session_close,
             usage_get,
+            claude_defaults,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

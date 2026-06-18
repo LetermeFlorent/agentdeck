@@ -33,10 +33,24 @@ class SessionsStore {
   map = $state<Record<string, SessionState>>({});
   /** Incrémenté à chaque changement à persister (sauvegarde déclenchée côté +page). */
   persistRev = $state(0);
+  /** Modèle / effort par défaut (Claude Code courant), pour pré-remplir les nouveaux panes. */
+  defaultModel = $state<string | null>(null);
+  defaultEffort = $state<string | null>(null);
   private unlisteners: Record<string, UnlistenFn> = {};
 
   private touch() {
     this.persistRev++;
+  }
+
+  async loadDefaults() {
+    try {
+      const d = await ipc.claudeDefaults();
+      this.defaultModel = d.model || null;
+      this.defaultEffort = d.effort || null;
+    } catch {
+      this.defaultModel = "opus";
+      this.defaultEffort = "medium";
+    }
   }
 
   async create(opts: { title?: string; cwd?: string; model?: string } = {}): Promise<string> {
@@ -44,8 +58,8 @@ class SessionsStore {
     this.map[id] = {
       id,
       title: opts.title ?? "Claude",
-      model: opts.model ?? null,
-      effort: null,
+      model: opts.model ?? this.defaultModel,
+      effort: this.defaultEffort,
       messages: [],
       streaming: false,
       error: null,

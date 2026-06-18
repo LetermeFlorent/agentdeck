@@ -55,6 +55,10 @@
   {:else if name === "terminal"}
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M7 9l3 3-3 3M13 15h4" />
+  {:else if name === "chevron"}
+    <path d="M6 9l6 6 6-6" />
+  {:else if name === "check"}
+    <path d="M5 12l4.5 4.5L19 7" />
   {:else if name === "grip"}
     <g fill="currentColor" stroke="none">
       <circle cx="9" cy="6" r="1.4" />

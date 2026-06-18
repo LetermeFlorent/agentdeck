@@ -30,6 +30,7 @@
   });
 
   async function bootDeck() {
+    await sessions.loadDefaults();
     const saved = persist.load();
     if (saved && saved.sessions.length > 0) {
       await sessions.hydrate(saved.sessions);

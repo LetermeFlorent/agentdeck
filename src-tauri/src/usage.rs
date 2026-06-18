@@ -42,8 +42,19 @@ impl Default for UsageData {
     }
 }
 
+/// Vrai usage d'abonnement récupéré via l'endpoint OAuth (token-driven, portable).
+#[derive(Clone, Copy)]
+struct RealUsage {
+    five_h_pct: f64,
+    five_h_reset: i64,
+    week_pct: f64,
+    week_reset: i64,
+    fetched_at: u64,
+}
+
 pub struct UsageStore {
     inner: Mutex<UsageData>,
+    real: Mutex<Option<RealUsage>>,
 }
 
 #[derive(Serialize)]
@@ -89,6 +100,13 @@ impl UsageStore {
             .unwrap_or_default();
         UsageStore {
             inner: Mutex::new(data),
+            real: Mutex::new(None),
+        }
+    }
+
+    fn set_real(&self, r: RealUsage) {
+        if let Ok(mut slot) = self.real.lock() {
+            *slot = Some(r);
         }
     }
 
@@ -176,6 +194,70 @@ pub fn record(store: &UsageStore, tokens: u64, cost: f64) {
     UsageStore::persist(&data);
 }
 
+// ---- Vrai usage via l'endpoint OAuth (api.anthropic.com/api/oauth/usage) ----
+
+const OAUTH_USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
+// User-Agent claude-code obligatoire, sinon l'endpoint renvoie des 429 persistants.
+const CLIENT_UA: &str = "claude-code/2.1.178";
+const POLL_INTERVAL_S: u64 = 185; // l'endpoint limite agressivement < 180s
+
+fn iso_to_epoch(s: &str) -> i64 {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|d| d.timestamp())
+        .unwrap_or(0)
+}
+
+/// Un appel à l'endpoint usage. Renvoie le vrai 5h/7j si succès.
+async fn fetch_real(token: &str) -> Option<RealUsage> {
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(OAUTH_USAGE_URL)
+        .header("Authorization", format!("Bearer {token}"))
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .header("User-Agent", CLIENT_UA)
+        .header("Content-Type", "application/json")
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let v: serde_json::Value = resp.json().await.ok()?;
+    let win = |key: &str| -> Option<(f64, i64)> {
+        let w = v.get(key)?;
+        let util = w.get("utilization").and_then(serde_json::Value::as_f64)?;
+        let reset = w
+            .get("resets_at")
+            .and_then(serde_json::Value::as_str)
+            .map(iso_to_epoch)
+            .unwrap_or(0);
+        Some((util, reset))
+    };
+    let (fh_pct, fh_reset) = win("five_hour")?;
+    let (wk_pct, wk_reset) = win("seven_day")?;
+    Some(RealUsage {
+        five_h_pct: fh_pct,
+        five_h_reset: fh_reset,
+        week_pct: wk_pct,
+        week_reset: wk_reset,
+        fetched_at: now(),
+    })
+}
+
+/// Boucle de fond : interroge l'endpoint toutes les ~185s avec le token courant
+/// et met en cache le vrai usage. Démarre dès qu'un token est présent.
+pub async fn run_poller(app: tauri::AppHandle) {
+    use tauri::Manager;
+    loop {
+        if let Some(token) = crate::auth::get_token() {
+            if let Some(r) = fetch_real(&token).await {
+                app.state::<UsageStore>().set_real(r);
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(POLL_INTERVAL_S)).await;
+    }
+}
+
 /// Calcule les barres 5h / semaine.
 pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
     let data = match store.inner.lock() {
@@ -197,25 +279,36 @@ pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
     let five_h_cost: f64 = in_window(five_h_cut).map(|e| e.cost).sum();
     let week_cost: f64 = in_window(week_cut).map(|e| e.cost).sum();
 
-    // Préférence : vraies limites d'abonnement (claude-statusbar). Repli : comptage local.
-    match real_rate_limits() {
-        Some((five_h, week)) => UsageSnapshot {
+    // Priorité des sources de "réel" :
+    //  1. endpoint OAuth interrogé par agentdeck (token-driven, portable) ;
+    //  2. cache claude-statusbar (si présent) ;
+    //  3. repli : comptage local "estimé".
+    let real_api = store.real.lock().ok().and_then(|g| *g);
+    if let Some(r) = real_api {
+        return UsageSnapshot {
+            five_h: bar_pct(r.five_h_pct, r.five_h_reset),
+            week: bar_pct(r.week_pct, r.week_reset),
+            five_h_cost,
+            week_cost,
+            source: "real".into(),
+        };
+    }
+    if let Some((five_h, week)) = real_rate_limits() {
+        return UsageSnapshot {
             five_h,
             week,
             five_h_cost,
             week_cost,
             source: "real".into(),
-        },
-        None => {
-            let five_h_tokens: u64 = in_window(five_h_cut).map(|e| e.tokens).sum();
-            let week_tokens: u64 = in_window(week_cut).map(|e| e.tokens).sum();
-            UsageSnapshot {
-                five_h: bar(five_h_tokens, data.five_h_cap),
-                week: bar(week_tokens, data.week_cap),
-                five_h_cost,
-                week_cost,
-                source: "estimated".into(),
-            }
-        }
+        };
+    }
+    let five_h_tokens: u64 = in_window(five_h_cut).map(|e| e.tokens).sum();
+    let week_tokens: u64 = in_window(week_cut).map(|e| e.tokens).sum();
+    UsageSnapshot {
+        five_h: bar(five_h_tokens, data.five_h_cap),
+        week: bar(week_tokens, data.week_cap),
+        five_h_cost,
+        week_cost,
+        source: "estimated".into(),
     }
 }
