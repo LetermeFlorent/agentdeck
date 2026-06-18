@@ -29,12 +29,13 @@ export interface UsageSnapshot {
 // Events émis par le backend sur session://{id} (tag "kind", snake_case).
 export type SessionEvent =
   | { kind: "started" }
+  | { kind: "init"; slash_commands: string[] }
   | { kind: "assistant_start" }
   | { kind: "assistant_delta"; text: string }
   | { kind: "tool_use"; name: string }
   | { kind: "tool_result"; ok: boolean }
   | { kind: "progress"; output_tokens: number }
-  | { kind: "turn_done"; input_tokens: number; output_tokens: number }
+  | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number }
   | { kind: "error"; message: string }
   | { kind: "exited"; code: number | null };
 

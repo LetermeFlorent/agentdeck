@@ -6,8 +6,10 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionEvent {
-    /// Le process de session est prêt (init reçu).
+    /// Le process de session est prêt (init reçu) + commandes slash disponibles.
     Started,
+    /// Init : liste des commandes slash exposées par Claude Code (dynamique).
+    Init { slash_commands: Vec<String> },
     /// Début d'un nouveau message assistant (nouveau tour, nouvelle bulle).
     AssistantStart,
     /// Fragment de texte de la réponse de l'assistant (streaming).
@@ -16,10 +18,12 @@ pub enum SessionEvent {
     ToolUse { name: String },
     /// Progression du tour : tokens de sortie cumulés (pour l'indicateur live).
     Progress { output_tokens: u64 },
-    /// Fin du tour, avec compteurs de tokens si disponibles.
+    /// Fin du tour : tokens du tour + coût cumulé de la session (USD).
     TurnDone {
         input_tokens: u64,
         output_tokens: u64,
+        total_tokens: u64,
+        cost_usd: f64,
     },
     /// Erreur (spawn, parse, auth…).
     Error { message: String },

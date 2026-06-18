@@ -195,6 +195,18 @@ pub async fn send(
 /// Traduit une ligne NDJSON en SessionEvent(s).
 fn handle_line(app: &tauri::AppHandle, id: &str, v: &Value) {
     match v.get("type").and_then(Value::as_str) {
+        Some("system") if v.get("subtype").and_then(Value::as_str) == Some("init") => {
+            let cmds: Vec<String> = v
+                .get("slash_commands")
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|c| c.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default();
+            emit(app, id, SessionEvent::Init { slash_commands: cmds });
+        }
         Some("stream_event") => {
             let ev = match v.get("event") {
                 Some(e) => e,
@@ -263,6 +275,8 @@ fn handle_line(app: &tauri::AppHandle, id: &str, v: &Value) {
                 SessionEvent::TurnDone {
                     input_tokens: input,
                     output_tokens: output,
+                    total_tokens: total,
+                    cost_usd: cost,
                 },
             );
         }

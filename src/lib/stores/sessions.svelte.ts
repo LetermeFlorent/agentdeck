@@ -28,6 +28,10 @@ export interface SessionState {
   turnStart: number | null;
   /** Tokens de sortie cumulés du tour en cours. */
   turnTokens: number;
+  /** Tokens totaux générés par ce chat (cumul des tours). */
+  totalTokens: number;
+  /** Coût cumulé du chat (USD). */
+  costUsd: number;
 }
 
 export interface PersistedSession {
@@ -47,6 +51,8 @@ class SessionsStore {
   /** Modèle / effort par défaut (Claude Code courant), pour pré-remplir les nouveaux panes. */
   defaultModel = $state<string | null>(null);
   defaultEffort = $state<string | null>(null);
+  /** Commandes slash exposées par Claude Code (récupérées dynamiquement à l'init). */
+  slashCommands = $state<string[]>([]);
   private unlisteners: Record<string, UnlistenFn> = {};
 
   private touch() {
@@ -94,6 +100,8 @@ class SessionsStore {
       queue: [],
       turnStart: null,
       turnTokens: 0,
+      totalTokens: 0,
+      costUsd: 0,
     };
     await this.attach(id);
     this.touch();
@@ -123,6 +131,8 @@ class SessionsStore {
         queue: [],
         turnStart: null,
         turnTokens: 0,
+        totalTokens: 0,
+        costUsd: 0,
       };
       await this.attach(p.id);
     }
@@ -233,6 +243,9 @@ class SessionsStore {
         // Process prêt (pas une nouvelle bulle).
         s.error = null;
         break;
+      case "init":
+        if (e.slash_commands.length > 0) this.slashCommands = e.slash_commands;
+        break;
       case "assistant_start": {
         // Nouveau tour → nouvelle bulle assistant (sauf si une bulle vide attend déjà).
         s.streaming = true;
@@ -256,6 +269,10 @@ class SessionsStore {
       case "turn_done":
         s.streaming = false;
         s.turnStart = null;
+        s.totalTokens += e.total_tokens;
+        // total_cost_usd est cumulatif par process → on prend la dernière valeur.
+        if (e.cost_usd >= s.costUsd || e.cost_usd === 0) s.costUsd = e.cost_usd || s.costUsd;
+        else s.costUsd = e.cost_usd; // process relancé (modèle changé) → réinitialisé
         usage.refresh();
         this.touch();
         break;

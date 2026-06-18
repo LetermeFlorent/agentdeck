@@ -87,6 +87,26 @@
     return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
   }
 
+  // Popup de commandes slash ("/") — liste récupérée dynamiquement de Claude Code.
+  let cmdSel = $state(0);
+  let cmdDismissed = $state(false);
+  const cmdQuery = $derived(
+    draft.startsWith("/") && !draft.includes(" ") ? draft.slice(1).toLowerCase() : null,
+  );
+  const cmdMatches = $derived(
+    cmdQuery === null
+      ? []
+      : sessions.slashCommands.filter((c) => c.toLowerCase().startsWith(cmdQuery)).slice(0, 8),
+  );
+  const showCmds = $derived(cmdMatches.length > 0 && !cmdDismissed);
+  $effect(() => {
+    if (cmdSel >= cmdMatches.length) cmdSel = 0;
+  });
+  function pickCmd(c: string) {
+    draft = "/" + c + " ";
+    cmdDismissed = true;
+  }
+
   // Autoscroll vers le bas quand le contenu change (cap scroll : conteneur borné).
   $effect(() => {
     const msgs = session?.messages;
@@ -105,6 +125,27 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    if (showCmds) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        cmdSel = (cmdSel + 1) % cmdMatches.length;
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        cmdSel = (cmdSel - 1 + cmdMatches.length) % cmdMatches.length;
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        pickCmd(cmdMatches[cmdSel]);
+        return;
+      }
+      if (e.key === "Escape") {
+        cmdDismissed = true;
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) submit(e);
   }
 
@@ -182,6 +223,11 @@
         >{session?.title ?? "Claude"}</span>
       {/if}
     </div>
+    {#if (session?.totalTokens ?? 0) > 0}
+      <span class="hdr-usage" use:tooltip={"Coût et tokens générés par ce chat"}>
+        ${(session?.costUsd ?? 0).toFixed(3)} · {fmtTok(session?.totalTokens ?? 0)}
+      </span>
+    {/if}
     <div class="actions">
       {#if session?.streaming}
         <button class="icon-btn" use:tooltip={"Arrêter"} onclick={() => sessions.stop(sid)}>
@@ -245,7 +291,24 @@
     {/if}
   </div>
 
-  <div class="composer eff-{session?.effort ?? 'medium'}">
+  <div class="composer">
+    {#if showCmds}
+      <div class="cmd-pop" in:fly={{ y: 6, duration: 130 }}>
+        {#each cmdMatches as c, i}
+          <button
+            type="button"
+            class="cmd-item"
+            class:sel={i === cmdSel}
+            onmousedown={(e) => {
+              e.preventDefault();
+              pickCmd(c);
+            }}
+          >
+            <span class="slash">/</span>{c}
+          </button>
+        {/each}
+      </div>
+    {/if}
     <div class="meta">
       <Dropdown
         label="Modèle"
@@ -257,14 +320,16 @@
         label="Effort"
         options={efforts}
         value={session?.effort ?? ""}
+        btnClass={`eff-${session?.effort ?? "medium"}`}
         onchange={(v) => sessions.setEffort(sid, v)}
       />
     </div>
     <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
       <textarea
-        placeholder="Message à Claude…"
+        placeholder="Message à Claude…  (/ pour les commandes)"
         bind:value={draft}
         onkeydown={onKey}
+        oninput={() => (cmdDismissed = false)}
         rows="1"
       ></textarea>
       {#if (session?.queue?.length ?? 0) > 0}
@@ -549,38 +614,52 @@
     background: var(--surface-2);
     flex-shrink: 0;
   }
-  /* Séparateur coloré selon l'effort (plus la puissance est haute, plus c'est marqué). */
-  .composer.eff-low {
-    border-top-color: var(--border);
-  }
-  .composer.eff-medium {
-    border-top-color: color-mix(in srgb, var(--accent) 25%, var(--border));
-  }
-  .composer.eff-high {
-    border-top-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  }
-  .composer.eff-xhigh,
-  .composer.eff-max,
-  .composer.eff-ultracode {
-    border-top-color: transparent;
+  .composer {
     position: relative;
   }
-  .composer.eff-xhigh::before,
-  .composer.eff-max::before,
-  .composer.eff-ultracode::before {
-    content: "";
+  /* Popup des commandes slash ("/") au-dessus du champ */
+  .cmd-pop {
     position: absolute;
-    top: -1px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), #e6a988, var(--accent), #cf7ea6, var(--accent));
-    background-size: 300% 100%;
-    animation: effFlow 5s linear infinite;
+    left: 7px;
+    right: 7px;
+    bottom: calc(100% + 4px);
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 -8px 26px rgba(0, 0, 0, 0.22);
+    padding: 5px;
+    z-index: 30;
   }
-  .composer.eff-max::before,
-  .composer.eff-ultracode::before {
-    animation: effFlow 2.3s linear infinite;
+  .cmd-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 9px;
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    text-align: left;
+  }
+  .cmd-item .slash {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .cmd-item:hover,
+  .cmd-item.sel {
+    background: var(--accent-weak);
+  }
+  .hdr-usage {
+    flex-shrink: 0;
+    margin-right: 6px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
 
   /* Indicateur de réflexion façon Claude Code */

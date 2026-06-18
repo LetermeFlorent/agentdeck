@@ -9,11 +9,13 @@
     options,
     label,
     onchange,
+    btnClass = "",
   }: {
     value: string;
     options: { v: string; l: string }[];
     label: string;
     onchange: (v: string) => void;
+    btnClass?: string;
   } = $props();
 
   let open = $state(false);
@@ -47,7 +49,7 @@
 <div class="dd" bind:this={root}>
   <button
     type="button"
-    class="dd-btn"
+    class="dd-btn {btnClass}"
     class:open
     class:set={value !== ""}
     use:tooltip={label}
@@ -106,6 +108,49 @@
   }
   .dd-btn.open {
     border-color: var(--accent);
+  }
+
+  /* Design distinct du bouton effort selon la puissance (même taille) */
+  .dd-btn.eff-low {
+    color: var(--text-faint);
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  .dd-btn.eff-medium {
+    color: var(--text-muted);
+    background: var(--bg);
+    border-color: var(--border-strong);
+  }
+  .dd-btn.eff-high {
+    color: var(--accent);
+    background: var(--accent-weak);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .dd-btn.eff-xhigh {
+    color: var(--accent);
+    background: var(--accent-weak);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+  .dd-btn.eff-max,
+  .dd-btn.eff-ultracode {
+    color: var(--accent);
+    font-weight: 700;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--surface-2), var(--surface-2)) padding-box,
+      linear-gradient(90deg, var(--accent), #e6a988, var(--accent), #cf7ea6, var(--accent)) border-box;
+    background-size: 100% 100%, 300% 100%;
+    animation: ddFlow 4s linear infinite;
+  }
+  .dd-btn.eff-ultracode {
+    animation: ddFlow 1.9s linear infinite;
+    box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  @keyframes ddFlow {
+    to {
+      background-position: 0 0, 300% 0;
+    }
   }
   .dd-chev {
     display: flex;
