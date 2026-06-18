@@ -25,14 +25,12 @@
   const session = $derived(sessions.map[sid]);
 
   const MODELS = [
-    { v: "", l: "Défaut" },
     { v: "opus", l: "Opus" },
     { v: "sonnet", l: "Sonnet" },
     { v: "haiku", l: "Haiku" },
     { v: "fable", l: "Fable" },
   ];
   const EFFORTS = [
-    { v: "", l: "Défaut" },
     { v: "low", l: "Low" },
     { v: "medium", l: "Medium" },
     { v: "high", l: "High" },

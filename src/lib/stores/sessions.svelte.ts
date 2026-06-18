@@ -82,8 +82,8 @@ class SessionsStore {
       this.map[p.id] = {
         id: p.id,
         title: p.title,
-        model: p.model,
-        effort: p.effort ?? null,
+        model: p.model ?? this.defaultModel,
+        effort: p.effort ?? this.defaultEffort,
         messages: p.messages,
         streaming: false,
         error: null,
