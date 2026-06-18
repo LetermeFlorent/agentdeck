@@ -46,11 +46,14 @@ pub(super) async fn spawn(
             cmd.arg("--model").arg(m);
         }
     }
-    if let Some(e) = effort {
-        if !e.is_empty() {
-            // "ultracode" (libellé Opus) n'est pas un --effort valide → mappé sur xhigh.
-            let level = if e == "ultracode" { "xhigh" } else { e.as_str() };
-            cmd.arg("--effort").arg(level);
+    // Haiku ne supporte pas l'effort → on n'envoie pas le flag.
+    if model.as_deref() != Some("haiku") {
+        if let Some(e) = effort {
+            if !e.is_empty() {
+                // "ultracode" (libellé Opus) n'est pas un --effort valide → mappé sur xhigh.
+                let level = if e == "ultracode" { "xhigh" } else { e.as_str() };
+                cmd.arg("--effort").arg(level);
+            }
         }
     }
     if let Some(dir) = cwd {

@@ -5,16 +5,16 @@
   import Dropdown from "../ui/Dropdown.svelte";
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
-  import { MODELS, EFFORTS, ULTRACODE } from "../chat/chat-config";
+  import { MODELS, effortsFor } from "../chat/chat-config";
   import { fly, fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
   let { onclose }: { onclose: () => void } = $props();
 
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
-  // Même logique que la listbox du chat : l'effort dépend du modèle (ultracode exclusif Opus).
+  // Même logique que la listbox du chat : l'effort dépend du modèle (xhigh Opus/Fable, rien sur Haiku).
   const selModel = $derived(settings.defaultModel ?? sessions.effModel);
-  const efforts = $derived(selModel === "opus" ? [...EFFORTS, ULTRACODE] : EFFORTS);
+  const efforts = $derived(effortsFor(selModel));
 </script>
 
 <div
@@ -64,14 +64,20 @@
     <div class="row">
       <div class="lbl">
         <span>Effort par défaut</span>
-        <span class="sub">{efforts.map((e) => e.v).join(" · ")}</span>
+        <span class="sub">
+          {efforts.length ? efforts.map((e) => e.v).join(" · ") : "Non réglable sur ce modèle"}
+        </span>
       </div>
-      <Dropdown
-        label="Effort"
-        options={efforts}
-        value={settings.defaultEffort ?? sessions.effEffort ?? ""}
-        onchange={(v) => settings.setDefaultEffort(v)}
-      />
+      {#if efforts.length}
+        <Dropdown
+          label="Effort"
+          options={efforts}
+          value={settings.defaultEffort ?? sessions.effEffort ?? ""}
+          onchange={(v) => settings.setDefaultEffort(v)}
+        />
+      {:else}
+        <span class="na">—</span>
+      {/if}
     </div>
 
     <button
@@ -279,5 +285,10 @@
     font-size: 11px;
     color: var(--text-faint);
     font-family: var(--font-mono);
+  }
+  .na {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
 </style>

@@ -7,16 +7,27 @@ export const MODELS = [
   { v: "fable", l: "Fable" },
 ];
 
-export const EFFORTS = [
-  { v: "low", l: "Low" },
-  { v: "medium", l: "Medium" },
-  { v: "high", l: "High" },
-  { v: "xhigh", l: "Xhigh" },
-  { v: "max", l: "Max" },
-];
-
+const LOW = { v: "low", l: "Low" };
+const MEDIUM = { v: "medium", l: "Medium" };
+const HIGH = { v: "high", l: "High" };
+const XHIGH = { v: "xhigh", l: "Xhigh" };
+const MAX = { v: "max", l: "Max" };
 // Ultracode : exclusif Opus (mappé sur --effort xhigh côté CLI).
 export const ULTRACODE = { v: "ultracode", l: "Ultracode" };
+
+/** Niveaux d'effort valides selon le modèle (xhigh = Opus/Fable seulement ; Haiku = aucun). */
+export function effortsFor(model: string | null | undefined): { v: string; l: string }[] {
+  switch (model) {
+    case "opus":
+      return [LOW, MEDIUM, HIGH, XHIGH, MAX, ULTRACODE];
+    case "fable":
+      return [LOW, MEDIUM, HIGH, XHIGH, MAX];
+    case "sonnet":
+      return [LOW, MEDIUM, HIGH, MAX];
+    default:
+      return []; // haiku & inconnu : effort non supporté par le modèle
+  }
+}
 
 // Tarifs par million de tokens (entrée / sortie) du modèle choisi.
 export const PRICES: Record<string, [number, number]> = {

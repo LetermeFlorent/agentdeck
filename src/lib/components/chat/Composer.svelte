@@ -5,7 +5,7 @@
   import Dropdown from "../ui/Dropdown.svelte";
   import SlashPopup from "./SlashPopup.svelte";
   import ContextGauge from "./ContextGauge.svelte";
-  import { MODELS, EFFORTS, ULTRACODE } from "./chat-config";
+  import { MODELS, effortsFor } from "./chat-config";
   import { tooltip } from "$lib/actions/tooltip";
   import { fly } from "svelte/transition";
 
@@ -16,7 +16,7 @@
   let ta = $state<HTMLTextAreaElement>();
 
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
-  const efforts = $derived(session?.model === "opus" ? [...EFFORTS, ULTRACODE] : EFFORTS);
+  const efforts = $derived(effortsFor(session?.model));
 
   // --- Images jointes (avant envoi) ---
   type Attached = { dataUrl: string; media_type: string; data: string; name: string };
@@ -205,13 +205,15 @@
       value={session?.model ?? ""}
       onchange={(v) => sessions.setModel(sid, v)}
     />
-    <Dropdown
-      label="Effort"
-      options={efforts}
-      value={session?.effort ?? ""}
-      btnClass={`eff-${session?.effort ?? "medium"}`}
-      onchange={(v) => sessions.setEffort(sid, v)}
-    />
+    {#if efforts.length}
+      <Dropdown
+        label="Effort"
+        options={efforts}
+        value={session?.effort ?? ""}
+        btnClass={`eff-${session?.effort ?? "medium"}`}
+        onchange={(v) => sessions.setEffort(sid, v)}
+      />
+    {/if}
   </div>
   <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
     <textarea
