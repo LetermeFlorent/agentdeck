@@ -183,6 +183,7 @@
 
       <div class="tabs">
         {#each tabs.list as t (t.id)}
+          <span class="tab-sep"></span>
           <div class="tab" class:active={t.id === tabs.activeId}>
             {#if renamingTab === t.id}
               <input
@@ -214,6 +215,7 @@
             {/if}
           </div>
         {/each}
+        <span class="tab-sep"></span>
         <button class="tab-add" use:tooltip={"Nouvel onglet"} onclick={() => tabs.create()}>
           <Icon name="plus" size={14} />
         </button>
@@ -431,6 +433,12 @@
   }
   .tabs::-webkit-scrollbar {
     height: 0;
+  }
+  .tab-sep {
+    flex-shrink: 0;
+    width: 1px;
+    height: 16px;
+    background: var(--border-strong);
   }
   .tab {
     display: flex;
