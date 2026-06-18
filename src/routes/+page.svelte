@@ -64,6 +64,7 @@
 
   async function bootDeck() {
     await sessions.loadDefaults();
+    sessions.loadSlashCommands(); // pré-charge la liste des commandes "/" (cache + fetch)
     const saved = settings.restoreOnLaunch ? persist.load() : null;
     if (saved && saved.sessions.length > 0) {
       await sessions.hydrate(saved.sessions);

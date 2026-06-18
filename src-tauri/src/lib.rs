@@ -72,6 +72,66 @@ async fn auth_login() -> Result<(), String> {
     auth::set_token(&token)
 }
 
+/// Récupère la liste des commandes slash de Claude Code en lisant le message `init`
+/// d'un process `claude` (aucun message envoyé → 0 token), puis tue le process.
+#[tauri::command]
+async fn slash_commands() -> Vec<String> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    let token = match auth::get_token() {
+        Some(t) => t,
+        None => return vec![],
+    };
+    let mut cmd = tokio::process::Command::new(provider::claude_code::claude_bin());
+    cmd.arg("-p")
+        .arg("--input-format")
+        .arg("stream-json")
+        .arg("--output-format")
+        .arg("stream-json")
+        .arg("--verbose")
+        .arg("--permission-mode")
+        .arg("bypassPermissions")
+        .env("CLAUDE_CODE_OAUTH_TOKEN", &token)
+        .env_remove("ANTHROPIC_API_KEY")
+        .env_remove("ANTHROPIC_AUTH_TOKEN")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true);
+
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(_) => return vec![],
+    };
+    let _stdin = child.stdin.take(); // garde stdin ouvert (n'envoie rien)
+    let stdout = child.stdout.take();
+
+    let read = async {
+        if let Some(out) = stdout {
+            let mut lines = BufReader::new(out).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
+                    if v.get("type").and_then(|x| x.as_str()) == Some("system")
+                        && v.get("subtype").and_then(|x| x.as_str()) == Some("init")
+                    {
+                        if let Some(arr) = v.get("slash_commands").and_then(|x| x.as_array()) {
+                            return arr
+                                .iter()
+                                .filter_map(|c| c.as_str().map(String::from))
+                                .collect::<Vec<_>>();
+                        }
+                    }
+                }
+            }
+        }
+        Vec::new()
+    };
+    let cmds = tokio::time::timeout(std::time::Duration::from_secs(20), read)
+        .await
+        .unwrap_or_default();
+    let _ = child.start_kill();
+    cmds
+}
+
 // ---------- Dépendance : Claude Code CLI ----------
 
 /// true si le binaire `claude` répond (`--version`).
@@ -315,6 +375,7 @@ pub fn run() {
             subscription_plan,
             check_claude,
             install_claude,
+            slash_commands,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -93,6 +93,9 @@ export const subscriptionPlan = () =>
 export const checkClaude = () => invoke<boolean>("check_claude");
 export const installClaude = () => invoke<void>("install_claude");
 
+// ---- Commandes slash (liste dynamique) ----
+export const slashCommandsFetch = () => invoke<string[]>("slash_commands");
+
 // ---- Events ----
 export const onSessionEvent = (id: string, cb: (e: SessionEvent) => void): Promise<UnlistenFn> =>
   listen<SessionEvent>(`session://${id}`, (evt) => cb(evt.payload));

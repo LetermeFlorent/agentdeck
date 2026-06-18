@@ -77,6 +77,26 @@ class SessionsStore {
     }
   }
 
+  /** Charge la liste des commandes slash (cache localStorage + fetch backend), pour le « / » immédiat. */
+  async loadSlashCommands() {
+    if (this.slashCommands.length > 0) return;
+    try {
+      const cached = JSON.parse(localStorage.getItem("agentdeck.slash.v1") || "[]");
+      if (Array.isArray(cached) && cached.length) this.slashCommands = cached;
+    } catch {
+      /* ignore */
+    }
+    try {
+      const list = await ipc.slashCommandsFetch();
+      if (list.length) {
+        this.slashCommands = list;
+        localStorage.setItem("agentdeck.slash.v1", JSON.stringify(list));
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
   /** Défaut effectif = override utilisateur (réglages) sinon modèle/effort Claude Code courant. */
   get effModel(): string | null {
     return settings.defaultModel ?? this.defaultModel;
@@ -244,7 +264,14 @@ class SessionsStore {
         s.error = null;
         break;
       case "init":
-        if (e.slash_commands.length > 0) this.slashCommands = e.slash_commands;
+        if (e.slash_commands.length > 0) {
+          this.slashCommands = e.slash_commands;
+          try {
+            localStorage.setItem("agentdeck.slash.v1", JSON.stringify(e.slash_commands));
+          } catch {
+            /* ignore */
+          }
+        }
         break;
       case "assistant_start": {
         // Nouveau tour → nouvelle bulle assistant (sauf si une bulle vide attend déjà).

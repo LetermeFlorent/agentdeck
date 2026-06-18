@@ -27,6 +27,15 @@
   let editing = $state(false);
   let titleDraft = $state("");
   let scroller = $state<HTMLDivElement>();
+  let ta = $state<HTMLTextAreaElement>();
+
+  // Bouton "/" : ouvre la liste des commandes slash.
+  function openCmds() {
+    sessions.loadSlashCommands(); // s'assure que la liste est chargée
+    if (!draft.startsWith("/")) draft = "/";
+    cmdDismissed = false;
+    ta?.focus();
+  }
 
   function startEdit() {
     titleDraft = session?.title ?? "Claude";
@@ -324,6 +333,13 @@
       </div>
     {/if}
     <div class="meta">
+      <button
+        type="button"
+        class="cmd-btn"
+        class:on={showCmds}
+        use:tooltip={"Commandes de Claude (/)"}
+        onclick={openCmds}
+      >/</button>
       <Dropdown
         label="Modèle"
         options={models}
@@ -340,6 +356,7 @@
     </div>
     <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
       <textarea
+        bind:this={ta}
         placeholder="Message à Claude…  (/ pour les commandes)"
         bind:value={draft}
         onkeydown={onKey}
@@ -705,6 +722,32 @@
     align-items: center;
     gap: 5px;
     flex-shrink: 0;
+  }
+  .cmd-btn {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+    transition: border-color var(--transition), color var(--transition), background var(--transition);
+  }
+  .cmd-btn:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .cmd-btn.on {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-weak);
   }
   .field {
     flex: 1;
