@@ -4,6 +4,7 @@
   import { theme } from "$lib/stores/theme.svelte";
   import { usage } from "$lib/stores/usage.svelte";
   import { layout } from "$lib/stores/layout.svelte";
+  import { tabs } from "$lib/stores/tabs.svelte";
   import { sessions } from "$lib/stores/sessions.svelte";
   import * as persist from "$lib/stores/persist";
   import { settings } from "$lib/stores/settings.svelte";
@@ -29,6 +30,22 @@
   let installErr = $state<string | null>(null);
   let showSettings = $state(false);
   let username = $state("");
+
+  // Renommage d'onglet inline.
+  let renamingTab = $state("");
+  let renameDraft = $state("");
+  function startRename(t: { id: string; name: string }) {
+    renamingTab = t.id;
+    renameDraft = t.name;
+  }
+  function commitRename() {
+    if (renamingTab) tabs.rename(renamingTab, renameDraft);
+    renamingTab = "";
+  }
+  function tabAutofocus(el: HTMLInputElement) {
+    el.focus();
+    el.select();
+  }
 
   onMount(async () => {
     theme.init();
@@ -88,11 +105,12 @@
     await sessions.loadDefaults();
     sessions.loadSlashCommands(); // pré-charge la liste des commandes "/" (cache + fetch)
     const saved = settings.restoreOnLaunch ? persist.load() : null;
-    if (saved && saved.sessions.length > 0) {
+    if (saved && saved.tabs.length > 0) {
       await sessions.hydrate(saved.sessions);
-      layout.restore(saved.root);
+      tabs.hydrate(saved.tabs, saved.activeId);
     } else {
       await layout.init();
+      tabs.initFromLayout();
     }
     // Loader visible au moins 3 s (minimum, pas maximum).
     const wait = 3000 - (Date.now() - t0);
@@ -106,6 +124,7 @@
     // dépendances suivies
     void sessions.persistRev;
     void layout.root;
+    void tabs.rev;
     if (booted) persist.save();
   });
 
@@ -114,6 +133,7 @@
     sessions.stopPrivacyWatch();
     persist.clear();
     await auth.logout();
+    tabs.reset();
     layout.root = null;
     initialized = false;
     booted = false;
@@ -160,6 +180,45 @@
           <span class="account" use:tooltip={`Compte connecté : ${plan.account}`}>{plan.account}</span>
         {/if}
       </div>
+
+      <div class="tabs">
+        {#each tabs.list as t (t.id)}
+          <div class="tab" class:active={t.id === tabs.activeId}>
+            {#if renamingTab === t.id}
+              <input
+                class="tab-edit"
+                bind:value={renameDraft}
+                use:tabAutofocus
+                onblur={commitRename}
+                onkeydown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitRename();
+                  } else if (e.key === "Escape") {
+                    renamingTab = "";
+                  }
+                }}
+              />
+            {:else}
+              <button
+                class="tab-btn"
+                use:tooltip={"Clic : ouvrir · double-clic : renommer"}
+                onclick={() => tabs.select(t.id)}
+                ondblclick={() => startRename(t)}
+              >{t.name}</button>
+            {/if}
+            {#if tabs.list.length > 1}
+              <button class="tab-x" use:tooltip={"Fermer l'onglet"} onclick={() => tabs.close(t.id)}>
+                <Icon name="close" size={11} />
+              </button>
+            {/if}
+          </div>
+        {/each}
+        <button class="tab-add" use:tooltip={"Nouvel onglet"} onclick={() => tabs.create()}>
+          <Icon name="plus" size={14} />
+        </button>
+      </div>
+
       <div class="spacer" data-tauri-drag-region></div>
       <UsageBars />
       <div class="divider"></div>
@@ -358,6 +417,86 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* Onglets (workspaces) : strip compact, scrollable si trop nombreux */
+  .tabs {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 46vw;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    height: 0;
+  }
+  .tab {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+  }
+  .tab.active {
+    background: var(--surface-2);
+    border-color: var(--border);
+  }
+  .tab-btn {
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    transition: color var(--transition);
+  }
+  .tab.active .tab-btn,
+  .tab-btn:hover {
+    color: var(--text);
+  }
+  .tab-x {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    color: var(--text-faint);
+    margin-right: 2px;
+  }
+  .tab-x:hover {
+    color: var(--danger);
+    background: var(--elevated);
+  }
+  .tab-edit {
+    width: 110px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    outline: none;
+  }
+  .tab-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition: background var(--transition), color var(--transition);
+  }
+  .tab-add:hover {
+    background: var(--surface-2);
+    color: var(--text);
   }
   .spacer {
     flex: 1;

@@ -1,19 +1,25 @@
-// Persistance locale du deck (sessions + disposition) pour retrouver ses Claudes au redémarrage.
-// Le webview Tauri conserve localStorage entre les lancements ; les sessions Claude elles-mêmes
-// sont reprises côté CLI via --resume (l'UUID est conservé).
+// Persistance locale du deck (onglets + dispositions + sessions) pour retrouver son espace
+// au redémarrage. Le webview Tauri conserve localStorage ; les sessions Claude sont reprises
+// côté CLI via --resume (l'UUID est conservé).
 
 import { sessions, type PersistedSession } from "./sessions.svelte";
-import { layout, type Node } from "./layout.svelte";
+import { tabs, type Tab } from "./tabs.svelte";
+import { type Node } from "./layout.svelte";
 
 const KEY = "agentdeck.deck.v1";
 
 interface DeckState {
-  root: Node | null;
+  tabs: Tab[];
+  activeId: string;
   sessions: PersistedSession[];
 }
 
 export function save() {
-  const state: DeckState = { root: layout.root, sessions: sessions.serialize() };
+  const state: DeckState = {
+    tabs: tabs.serialize(),
+    activeId: tabs.activeId,
+    sessions: sessions.serialize(),
+  };
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {
@@ -25,7 +31,20 @@ export function load(): DeckState | null {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as DeckState;
+    const parsed = JSON.parse(raw) as Partial<DeckState> & { root?: Node | null };
+    // Migration : ancien format { root, sessions } → un seul onglet.
+    if (!parsed.tabs && "root" in parsed) {
+      return {
+        tabs: [{ id: "t0", name: "Onglet 1", root: parsed.root ?? null }],
+        activeId: "t0",
+        sessions: parsed.sessions ?? [],
+      };
+    }
+    return {
+      tabs: parsed.tabs ?? [],
+      activeId: parsed.activeId ?? "",
+      sessions: parsed.sessions ?? [],
+    };
   } catch {
     return null;
   }
