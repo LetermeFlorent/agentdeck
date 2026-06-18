@@ -89,3 +89,32 @@ textarea {
   background: var(--surface-2);
   color: var(--text);
 }
+
+/* Tooltip stylé (action use:tooltip) */
+.tip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: 240px;
+  padding: 5px 9px;
+  background: var(--elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.4;
+  white-space: normal;
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition: opacity 130ms ease, transform 130ms ease;
+}
+.tip.below {
+  transform: translateY(-4px) scale(0.98);
+}
+.tip.tip-in {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+

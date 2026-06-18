@@ -52,7 +52,7 @@ fn auth_import_from_file(path: Option<String>) -> Result<(), String> {
 /// récupère le token OAuth émis et le stocke. Expérimental (dépend de l'interactivité du CLI).
 #[tauri::command]
 async fn auth_login() -> Result<(), String> {
-    let output = tokio::process::Command::new("claude")
+    let output = tokio::process::Command::new(provider::claude_code::claude_bin())
         .arg("setup-token")
         .output()
         .await
@@ -71,6 +71,40 @@ async fn auth_login() -> Result<(), String> {
             "Pas de token récupéré. Utilise plutôt l'import du fichier token.".to_string()
         })?;
     auth::set_token(&token)
+}
+
+// ---------- Dépendance : Claude Code CLI ----------
+
+/// true si le binaire `claude` répond (`--version`).
+#[tauri::command]
+async fn check_claude() -> bool {
+    tokio::process::Command::new(provider::claude_code::claude_bin())
+        .arg("--version")
+        .output()
+        .await
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Installe Claude Code via l'installeur natif officiel (Windows PowerShell).
+#[tauri::command]
+async fn install_claude() -> Result<(), String> {
+    let out = tokio::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "irm https://claude.ai/install.ps1 | iex",
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Lancement installeur : {e}"))?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+    }
 }
 
 // ---------- Sessions ----------
@@ -209,6 +243,55 @@ fn claude_defaults() -> serde_json::Value {
     serde_json::json!({ "model": model, "effort": effort })
 }
 
+/// Plan d'abonnement (lu dans ~/.claude/.credentials.json). `level` 0–4 pilote l'effet visuel.
+#[tauri::command]
+fn subscription_plan() -> serde_json::Value {
+    let read = || -> Option<(String, String)> {
+        let mut p = dirs::home_dir()?;
+        p.push(".claude");
+        p.push(".credentials.json");
+        let raw = std::fs::read_to_string(p).ok()?;
+        let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+        let o = v.get("claudeAiOauth")?;
+        let sub = o
+            .get("subscriptionType")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        let tier = o
+            .get("rateLimitTier")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        Some((sub, tier))
+    };
+    let (sub, tier) = read().unwrap_or_default();
+    let (label, level): (String, u8) = if tier.contains("max_20x") {
+        ("Max 20×".into(), 4)
+    } else if tier.contains("max_5x") {
+        ("Max 5×".into(), 3)
+    } else if tier.contains("pro") {
+        ("Pro".into(), 1)
+    } else {
+        match sub.as_str() {
+            "max" => ("Max".into(), 3),
+            "pro" => ("Pro".into(), 1),
+            "team" => ("Team".into(), 4),
+            "enterprise" => ("Enterprise".into(), 4),
+            "" => (String::new(), 0),
+            other => {
+                let mut c = other.chars();
+                let cap = c
+                    .next()
+                    .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                    .unwrap_or_default();
+                (cap, 2)
+            }
+        }
+    };
+    serde_json::json!({ "label": label, "level": level })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -219,6 +302,13 @@ pub fn run() {
             // Poller de fond : vrai usage d'abonnement via l'endpoint OAuth.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(usage::run_poller(handle));
+            // Met à jour Claude Code au démarrage (best-effort, non bloquant).
+            tauri::async_runtime::spawn(async {
+                let _ = tokio::process::Command::new(provider::claude_code::claude_bin())
+                    .arg("update")
+                    .output()
+                    .await;
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -235,6 +325,9 @@ pub fn run() {
             session_close,
             usage_get,
             claude_defaults,
+            subscription_plan,
+            check_claude,
+            install_claude,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

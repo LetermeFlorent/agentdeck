@@ -82,6 +82,14 @@ export const usageGet = () => invoke<UsageSnapshot>("usage_get");
 export const claudeDefaults = () =>
   invoke<{ model: string; effort: string }>("claude_defaults");
 
+// ---- Plan d'abonnement ----
+export const subscriptionPlan = () =>
+  invoke<{ label: string; level: number }>("subscription_plan");
+
+// ---- Dépendance Claude Code ----
+export const checkClaude = () => invoke<boolean>("check_claude");
+export const installClaude = () => invoke<void>("install_claude");
+
 // ---- Events ----
 export const onSessionEvent = (id: string, cb: (e: SessionEvent) => void): Promise<UnlistenFn> =>
   listen<SessionEvent>(`session://${id}`, (evt) => cb(evt.payload));

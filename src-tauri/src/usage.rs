@@ -49,7 +49,6 @@ struct RealUsage {
     five_h_reset: i64,
     week_pct: f64,
     week_reset: i64,
-    fetched_at: u64,
 }
 
 pub struct UsageStore {
@@ -240,7 +239,6 @@ async fn fetch_real(token: &str) -> Option<RealUsage> {
         five_h_reset: fh_reset,
         week_pct: wk_pct,
         week_reset: wk_reset,
-        fetched_at: now(),
     })
 }
 

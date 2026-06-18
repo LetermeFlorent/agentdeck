@@ -1,5 +1,6 @@
 <script lang="ts">
   import { usage } from "$lib/stores/usage.svelte";
+  import { tooltip } from "$lib/actions/tooltip";
 
   function fmt(n: number): string {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -30,14 +31,14 @@
   {#if usage.snapshot}
     {@const s = usage.snapshot}
     {@const real = s.source === "real"}
-    <div class="row" title={tip("5h", s.five_h, s.five_h_cost, real)}>
+    <div class="row" use:tooltip={tip("5h", s.five_h, s.five_h_cost, real)}>
       <span class="lbl">5h</span>
       <div class="track">
         <div class="fill" style={`width:${s.five_h.pct}%;background:${tone(s.five_h.pct)}`}></div>
       </div>
       <span class="pct">{s.five_h.pct}%</span>
     </div>
-    <div class="row" title={tip("7j", s.week, s.week_cost, real)}>
+    <div class="row" use:tooltip={tip("7j", s.week, s.week_cost, real)}>
       <span class="lbl">7j</span>
       <div class="track">
         <div class="fill" style={`width:${s.week.pct}%;background:${tone(s.week.pct)}`}></div>
@@ -45,9 +46,9 @@
       <span class="pct">{s.week.pct}%</span>
     </div>
     {#if real}
-      <span class="src real" title="Vraies limites d'abonnement (5h / 7j) lues depuis claude-statusbar.">réel</span>
+      <span class="src real" use:tooltip={"Vraies limites d'abonnement (5h / 7j) via l'endpoint OAuth Claude."}>réel</span>
     {:else}
-      <span class="src" title="Pas de donnée réelle dispo (claude-statusbar absent) — estimation locale des tokens consommés via l'app.">estimé</span>
+      <span class="src" use:tooltip={"Pas de donnée réelle dispo — estimation locale des tokens consommés via l'app."}>estimé</span>
     {/if}
   {/if}
 </div>

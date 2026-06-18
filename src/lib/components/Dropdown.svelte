@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
+  import { tooltip } from "$lib/actions/tooltip";
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
@@ -49,7 +50,7 @@
     class="dd-btn"
     class:open
     class:set={value !== ""}
-    title={label}
+    use:tooltip={label}
     onclick={() => (open = !open)}
   >
     <span class="dd-cur">{current}</span>

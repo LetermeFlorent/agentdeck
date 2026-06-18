@@ -4,6 +4,7 @@ import * as ipc from "$lib/ipc";
 import type { SessionEvent } from "$lib/ipc";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { usage } from "./usage.svelte";
+import { settings } from "./settings.svelte";
 
 export interface Msg {
   role: "user" | "assistant";
@@ -19,6 +20,8 @@ export interface SessionState {
   messages: Msg[];
   streaming: boolean;
   error: string | null;
+  collapsed: boolean;
+  priv: boolean;
 }
 
 export interface PersistedSession {
@@ -27,6 +30,8 @@ export interface PersistedSession {
   model: string | null;
   effort: string | null;
   messages: Msg[];
+  collapsed?: boolean;
+  priv?: boolean;
 }
 
 class SessionsStore {
@@ -42,6 +47,13 @@ class SessionsStore {
     this.persistRev++;
   }
 
+  /** (Ré)attache l'écouteur d'events d'une session sans jamais en laisser deux (évite les réponses dupliquées). */
+  private async attach(id: string) {
+    const old = this.unlisteners[id];
+    if (old) old();
+    this.unlisteners[id] = await ipc.onSessionEvent(id, (e) => this.handle(id, e));
+  }
+
   async loadDefaults() {
     try {
       const d = await ipc.claudeDefaults();
@@ -53,18 +65,28 @@ class SessionsStore {
     }
   }
 
+  /** Défaut effectif = override utilisateur (réglages) sinon modèle/effort Claude Code courant. */
+  get effModel(): string | null {
+    return settings.defaultModel ?? this.defaultModel;
+  }
+  get effEffort(): string | null {
+    return settings.defaultEffort ?? this.defaultEffort;
+  }
+
   async create(opts: { title?: string; cwd?: string; model?: string } = {}): Promise<string> {
     const id = await ipc.sessionCreate(opts);
     this.map[id] = {
       id,
       title: opts.title ?? "Claude",
-      model: opts.model ?? this.defaultModel,
-      effort: this.defaultEffort,
+      model: opts.model ?? this.effModel,
+      effort: this.effEffort,
       messages: [],
       streaming: false,
       error: null,
+      collapsed: false,
+      priv: false,
     };
-    this.unlisteners[id] = await ipc.onSessionEvent(id, (e) => this.handle(id, e));
+    await this.attach(id);
     this.touch();
     return id;
   }
@@ -82,13 +104,15 @@ class SessionsStore {
       this.map[p.id] = {
         id: p.id,
         title: p.title,
-        model: p.model ?? this.defaultModel,
-        effort: p.effort ?? this.defaultEffort,
+        model: p.model ?? this.effModel,
+        effort: p.effort ?? this.effEffort,
         messages: p.messages,
         streaming: false,
         error: null,
+        collapsed: p.collapsed ?? false,
+        priv: p.priv ?? false,
       };
-      this.unlisteners[p.id] = await ipc.onSessionEvent(p.id, (e) => this.handle(p.id, e));
+      await this.attach(p.id);
     }
   }
 
@@ -99,7 +123,33 @@ class SessionsStore {
       model: s.model,
       effort: s.effort,
       messages: s.messages,
+      collapsed: s.collapsed,
+      priv: s.priv,
     }));
+  }
+
+  /** Replie / déplie un pane (minimise sur le côté). */
+  setCollapsed(id: string, collapsed: boolean) {
+    const s = this.map[id];
+    if (!s) return;
+    s.collapsed = collapsed;
+    this.touch();
+  }
+
+  /** Mode privé : floute le contenu (veille), garde le statut visible. */
+  setPrivate(id: string, priv: boolean) {
+    const s = this.map[id];
+    if (!s) return;
+    s.priv = priv;
+    this.touch();
+  }
+
+  /** Renomme un pane. */
+  setTitle(id: string, title: string) {
+    const s = this.map[id];
+    if (!s) return;
+    s.title = title;
+    this.touch();
   }
 
   /** Change le modèle / l'effort d'un pane (appliqué au prochain tour). */
@@ -183,6 +233,14 @@ class SessionsStore {
       case "error":
         s.error = e.message;
         s.streaming = false;
+        // Modèle indisponible → on le retire des listes et on bascule sur un modèle dispo.
+        if (s.model && /selected model|may not exist|access to it|model.*not.*available/i.test(e.message)) {
+          settings.markModelUnavailable(s.model);
+          const fallback = ["opus", "sonnet", "haiku", "fable"].find(
+            (m) => m !== s.model && !settings.unavailableModels.includes(m),
+          );
+          s.model = fallback ?? null;
+        }
         this.touch();
         break;
       case "exited":

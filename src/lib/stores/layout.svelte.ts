@@ -14,6 +14,8 @@ export interface SplitNode {
   kind: "split";
   nodeId: string;
   dir: Dir;
+  /** Part (0–1) de l'espace allouée au panneau A (le reste à B). Redimensionnable. */
+  ratio: number;
   a: Node;
   b: Node;
 }
@@ -32,12 +34,13 @@ function syncCounter(node: Node) {
   }
 }
 
-/** Migre les anciens arbres persistés (dir "col" → "column" CSS valide). */
-function migrateDirs(node: Node) {
+/** Migre les anciens arbres persistés (dir "col" → "column", ratio par défaut). */
+function migrateNodes(node: Node) {
   if (node.kind === "split") {
     if ((node.dir as string) === "col") node.dir = "column";
-    migrateDirs(node.a);
-    migrateDirs(node.b);
+    if (typeof node.ratio !== "number") node.ratio = 0.5;
+    migrateNodes(node.a);
+    migrateNodes(node.b);
   }
 }
 
@@ -74,10 +77,19 @@ class LayoutStore {
   /** Restaure un arbre persité (les sessions correspondantes doivent déjà être hydratées). */
   restore(root: Node | null) {
     if (root) {
-      migrateDirs(root);
+      migrateNodes(root);
       syncCounter(root);
     }
     this.root = root;
+  }
+
+  /** Redimensionne un split (part de A entre 0.12 et 0.88). */
+  setRatio(nodeId: string, ratio: number) {
+    if (!this.root) return;
+    const r = Math.max(0.12, Math.min(0.88, ratio));
+    this.root = mapTree(this.root, (n) =>
+      n.kind === "split" && n.nodeId === nodeId ? { ...n, ratio: r } : n,
+    );
   }
 
   /** Scinde une feuille : crée une nouvelle session dans le nouveau pane. */
@@ -93,6 +105,7 @@ class LayoutStore {
           kind: "split",
           nodeId: nid(),
           dir,
+          ratio: 0.5,
           a: n,
           b: { kind: "leaf", nodeId: nid(), sid: newSid },
         };

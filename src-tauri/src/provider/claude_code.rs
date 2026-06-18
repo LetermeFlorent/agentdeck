@@ -18,6 +18,20 @@ use crate::usage;
 
 pub struct ClaudeCodeProvider;
 
+/// Résout le binaire `claude` : chemin connu de l'installeur natif (~/.local/bin) s'il existe
+/// (PATH pas forcément rafraîchi juste après installation), sinon "claude" depuis le PATH.
+pub fn claude_bin() -> std::ffi::OsString {
+    if let Some(home) = dirs::home_dir() {
+        for name in ["claude.exe", "claude"] {
+            let p = home.join(".local").join("bin").join(name);
+            if p.exists() {
+                return p.into_os_string();
+            }
+        }
+    }
+    std::ffi::OsString::from("claude")
+}
+
 impl Provider for ClaudeCodeProvider {
     fn start_turn(&self, app: tauri::AppHandle, cfg: TurnConfig, running: SharedChild) {
         tauri::async_runtime::spawn(async move {
@@ -33,15 +47,16 @@ fn emit(app: &tauri::AppHandle, id: &str, ev: SessionEvent) {
 async fn run_turn(app: tauri::AppHandle, cfg: TurnConfig, running: SharedChild) {
     let id = cfg.id.clone();
 
-    let mut cmd = Command::new("claude");
+    let mut cmd = Command::new(claude_bin());
     cmd.arg("-p")
         .arg(&cfg.prompt)
         .arg("--output-format")
         .arg("stream-json")
         .arg("--verbose")
         .arg("--include-partial-messages")
+        // Exécute commandes/outils directement, sans prompt (comme une console claude).
         .arg("--permission-mode")
-        .arg("acceptEdits");
+        .arg("bypassPermissions");
 
     if cfg.resume {
         cmd.arg("--resume").arg(&cfg.id);

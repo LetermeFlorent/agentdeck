@@ -1,18 +1,22 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
+  import { settings } from "$lib/stores/settings.svelte";
   import Icon from "./Icon.svelte";
   import Dropdown from "./Dropdown.svelte";
+  import { tooltip } from "$lib/actions/tooltip";
   import { fly } from "svelte/transition";
 
   let {
     sid,
     nodeId,
+    canMinimize = false,
     onsplit,
     onclose,
     onmove,
   }: {
     sid: string;
     nodeId: string;
+    canMinimize?: boolean;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
     onmove: (fromNodeId: string) => void;
@@ -20,9 +24,26 @@
 
   let draft = $state("");
   let dragOver = $state(false);
-  let scroller: HTMLDivElement;
+  let editing = $state(false);
+  let titleDraft = $state("");
+  let scroller = $state<HTMLDivElement>();
+
+  function startEdit() {
+    titleDraft = session?.title ?? "Claude";
+    editing = true;
+  }
+  function saveTitle() {
+    const t = titleDraft.trim();
+    if (t) sessions.setTitle(sid, t);
+    editing = false;
+  }
+  function autofocus(el: HTMLInputElement) {
+    el.focus();
+    el.select();
+  }
 
   const session = $derived(sessions.map[sid]);
+  const collapsed = $derived(session?.collapsed ?? false);
 
   const MODELS = [
     { v: "opus", l: "Opus" },
@@ -37,6 +58,8 @@
     { v: "xhigh", l: "Xhigh" },
     { v: "max", l: "Max" },
   ];
+
+  const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
 
   // Autoscroll vers le bas quand le contenu change (cap scroll : conteneur borné).
   $effect(() => {
@@ -79,44 +102,91 @@
 <div
   class="pane"
   class:drag-over={dragOver}
+  class:collapsed
   role="group"
   ondragover={dragOverH}
   ondragleave={() => (dragOver = false)}
   ondrop={dropH}
 >
+  {#if collapsed}
+    <div class="strip">
+      <button class="icon-btn" use:tooltip={"Déplier le chat"} onclick={() => sessions.setCollapsed(sid, false)}>
+        <span class="chev open"><Icon name="chevron" size={15} /></span>
+      </button>
+      <span class="status" class:live={session?.streaming}></span>
+      <span class="strip-title">{session?.title ?? "Claude"}</span>
+      <span class="strip-state" class:work={session?.streaming} use:tooltip={session?.streaming ? "Claude travaille" : "Inactif"}></span>
+    </div>
+  {:else}
   <header class="pane-head">
     <div
       class="title"
       role="button"
       tabindex="0"
       aria-label="Glisser pour déplacer ce chat"
-      draggable="true"
+      draggable={!editing}
       ondragstart={dragStart}
-      title="Glisser pour déplacer ce chat"
+      use:tooltip={"Glisser pour déplacer · double-clic pour renommer"}
     >
       <span class="grip"><Icon name="grip" size={14} /></span>
       <span class="status" class:live={session?.streaming}></span>
-      <span class="name">{session?.title ?? "Claude"}</span>
+      {#if editing}
+        <input
+          class="name-edit"
+          bind:value={titleDraft}
+          use:autofocus
+          onblur={saveTitle}
+          onkeydown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              saveTitle();
+            } else if (e.key === "Escape") {
+              editing = false;
+            }
+          }}
+        />
+      {:else}
+        <span
+          class="name"
+          role="button"
+          tabindex="0"
+          use:tooltip={"Double-clic pour renommer"}
+          ondblclick={startEdit}
+        >{session?.title ?? "Claude"}</span>
+      {/if}
     </div>
     <div class="actions">
       {#if session?.streaming}
-        <button class="icon-btn" title="Arrêter" onclick={() => sessions.stop(sid)}>
+        <button class="icon-btn" use:tooltip={"Arrêter"} onclick={() => sessions.stop(sid)}>
           <Icon name="stop" size={15} />
         </button>
       {/if}
-      <button class="icon-btn" title="Diviser horizontalement (haut / bas)" onclick={() => onsplit("column")}>
+      <button
+        class="icon-btn"
+        class:on={session?.priv}
+        use:tooltip={session?.priv ? "Désactiver le mode privé" : "Mode privé (flouter le contenu)"}
+        onclick={() => sessions.setPrivate(sid, !session?.priv)}
+      >
+        <Icon name={session?.priv ? "eye-off" : "eye"} size={15} />
+      </button>
+      {#if canMinimize}
+        <button class="icon-btn" use:tooltip={"Minimiser sur le côté"} onclick={() => sessions.setCollapsed(sid, true)}>
+          <span class="chev close"><Icon name="chevron" size={15} /></span>
+        </button>
+      {/if}
+      <button class="icon-btn" use:tooltip={"Diviser horizontalement (haut / bas)"} onclick={() => onsplit("column")}>
         <Icon name="split-v" />
       </button>
-      <button class="icon-btn" title="Diviser verticalement (côte à côte)" onclick={() => onsplit("row")}>
+      <button class="icon-btn" use:tooltip={"Diviser verticalement (côte à côte)"} onclick={() => onsplit("row")}>
         <Icon name="split-h" />
       </button>
-      <button class="icon-btn close" title="Fermer le pane" onclick={onclose}>
+      <button class="icon-btn close" use:tooltip={"Fermer le pane"} onclick={onclose}>
         <Icon name="close" />
       </button>
     </div>
   </header>
 
-  <div class="messages" bind:this={scroller}>
+  <div class="messages" class:blur={session?.priv} bind:this={scroller}>
     {#if !session || session.messages.length === 0}
       <div class="empty">
         <div class="empty-icon"><Icon name="terminal" size={26} stroke={1.6} /></div>
@@ -147,7 +217,7 @@
     <div class="meta">
       <Dropdown
         label="Modèle"
-        options={MODELS}
+        options={models}
         value={session?.model ?? ""}
         onchange={(v) => sessions.setModel(sid, v)}
       />
@@ -158,7 +228,7 @@
         onchange={(v) => sessions.setEffort(sid, v)}
       />
     </div>
-    <form class="field" onsubmit={submit}>
+    <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
       <textarea
         placeholder="Message à Claude…"
         bind:value={draft}
@@ -169,10 +239,11 @@
         class="send"
         type="submit"
         disabled={!draft.trim() || session?.streaming}
-        title="Envoyer (Entrée)"
+        use:tooltip={"Envoyer (Entrée)"}
       ><Icon name="send" size={15} /></button>
     </form>
   </div>
+  {/if}
 </div>
 
 <style>
@@ -190,6 +261,64 @@
   .pane.drag-over {
     border-color: var(--accent);
     box-shadow: inset 0 0 0 1px var(--accent);
+  }
+  .chev {
+    display: flex;
+    transition: transform var(--transition);
+  }
+  .chev.close {
+    transform: rotate(90deg);
+  }
+  .chev.open {
+    transform: rotate(-90deg);
+  }
+  .icon-btn.on {
+    color: var(--accent);
+    background: var(--accent-weak);
+  }
+  /* Mode privé : floute le contenu (le statut reste visible dans l'entête) */
+  .messages.blur {
+    filter: blur(7px);
+    opacity: 0.55;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* Bande latérale quand le chat est minimisé sur le côté */
+  .strip {
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    background: var(--surface-2);
+  }
+  .strip-title {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-height: 60%;
+    margin: 2px 0;
+  }
+  .strip-state {
+    margin-top: auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .strip-state.work {
+    background: var(--good);
+    animation: pulseDot 1.6s ease-in-out infinite;
   }
   .pane-head {
     display: flex;
@@ -247,6 +376,21 @@
     font-size: 12px;
     font-weight: 600;
     letter-spacing: -0.01em;
+    cursor: text;
+  }
+  .name-edit {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 1px 5px;
+    outline: none;
+    width: 130px;
+    max-width: 100%;
   }
   .actions {
     display: flex;
@@ -363,7 +507,7 @@
      + saisie + envoi sur une seule ligne. */
   .composer {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 6px;
     padding: 6px 7px;
     border-top: 1px solid var(--border);
@@ -372,6 +516,7 @@
   }
   .meta {
     display: flex;
+    align-items: center;
     gap: 5px;
     flex-shrink: 0;
   }
@@ -387,8 +532,42 @@
     border-radius: var(--radius);
     transition: border-color var(--transition);
   }
-  .field:focus-within {
+  .field:not(.eff-xhigh):not(.eff-max):focus-within {
     border-color: var(--accent);
+  }
+  /* Contour animé selon l'effort demandé (low → max de plus en plus marqué). */
+  .field.eff-low {
+    border-color: var(--border);
+  }
+  .field.eff-medium {
+    border-color: color-mix(in srgb, var(--accent) 25%, var(--border));
+  }
+  .field.eff-high {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    animation: effPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes effPulse {
+    0%, 100% { box-shadow: 0 0 0 0 transparent; }
+    50% { box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 32%, transparent); }
+  }
+  .field.eff-xhigh,
+  .field.eff-max {
+    border: 1px solid transparent;
+    background:
+      linear-gradient(var(--bg), var(--bg)) padding-box,
+      linear-gradient(90deg, var(--accent), #e6a988, var(--accent), #cf7ea6, var(--accent)) border-box;
+    background-size: 100% 100%, 300% 100%;
+    animation: effFlow 5s linear infinite;
+  }
+  .field.eff-max {
+    animation: effFlow 2.3s linear infinite, effGlow 2s ease-in-out infinite;
+  }
+  @keyframes effFlow {
+    to { background-position: 0 0, 300% 0; }
+  }
+  @keyframes effGlow {
+    0%, 100% { box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 30%, transparent); }
+    50% { box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 58%, transparent); }
   }
   textarea {
     flex: 1;

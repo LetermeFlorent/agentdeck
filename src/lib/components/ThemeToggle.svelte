@@ -1,6 +1,7 @@
 <script lang="ts">
   import { theme, type ThemeChoice } from "$lib/stores/theme.svelte";
   import Icon from "./Icon.svelte";
+  import { tooltip } from "$lib/actions/tooltip";
 
   const opts: { value: ThemeChoice; label: string; icon: string }[] = [
     { value: "system", label: "Système", icon: "monitor" },
@@ -14,7 +15,7 @@
     <button
       class="seg-item"
       class:active={theme.choice === o.value}
-      title={o.label}
+      use:tooltip={o.label}
       aria-pressed={theme.choice === o.value}
       onclick={() => theme.set(o.value)}
     >
