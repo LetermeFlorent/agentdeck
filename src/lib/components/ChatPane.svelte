@@ -64,6 +64,15 @@
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
   const efforts = $derived(session?.model === "opus" ? [...EFFORTS, ULTRACODE] : EFFORTS);
 
+  // Tarifs par million de tokens (entrée / sortie) du modèle choisi.
+  const PRICES: Record<string, [number, number]> = {
+    opus: [5, 25],
+    sonnet: [3, 15],
+    haiku: [1, 5],
+    fable: [10, 50],
+  };
+  const price = $derived(PRICES[session?.model ?? "opus"] ?? null);
+
   // Indicateur de réflexion (façon Claude Code) : spinner + secondes + tokens.
   const FRAMES = ["✶", "✸", "✹", "✺", "✹", "✷"];
   const VERBS = ["Réflexion", "Cogitation", "Mijotage", "Élucubration", "Tergiversation"];
@@ -223,6 +232,11 @@
         >{session?.title ?? "Claude"}</span>
       {/if}
     </div>
+    {#if price}
+      <span class="hdr-price" use:tooltip={"Tarif du modèle, par million de tokens (entrée / sortie)"}>
+        ↑${price[0]} ↓${price[1]}/M
+      </span>
+    {/if}
     {#if (session?.totalTokens ?? 0) > 0}
       <span class="hdr-usage" use:tooltip={"Coût et tokens générés par ce chat"}>
         ${(session?.costUsd ?? 0).toFixed(3)} · {fmtTok(session?.totalTokens ?? 0)}
@@ -652,7 +666,8 @@
   .cmd-item.sel {
     background: var(--accent-weak);
   }
-  .hdr-usage {
+  .hdr-usage,
+  .hdr-price {
     flex-shrink: 0;
     margin-right: 6px;
     font-family: var(--font-mono);
@@ -660,6 +675,9 @@
     color: var(--text-faint);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+  }
+  .hdr-price {
+    color: var(--text-muted);
   }
 
   /* Indicateur de réflexion façon Claude Code */
