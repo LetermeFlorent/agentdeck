@@ -3,16 +3,20 @@
   import { layout } from "$lib/stores/layout.svelte";
   import ChatPane from "./ChatPane.svelte";
   import Self from "./SplitContainer.svelte";
+  import { scale } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
 
   let { node }: { node: Node } = $props();
 </script>
 
 {#if node.kind === "leaf"}
-  <div class="leaf">
+  <div class="leaf" in:scale={{ duration: 200, start: 0.97, opacity: 0, easing: cubicOut }}>
     <ChatPane
       sid={node.sid}
+      nodeId={node.nodeId}
       onsplit={(dir) => layout.split(node.nodeId, dir)}
       onclose={() => layout.close(node.nodeId, node.sid)}
+      onmove={(fromNodeId) => layout.swap(fromNodeId, node.nodeId)}
     />
   </div>
 {:else}

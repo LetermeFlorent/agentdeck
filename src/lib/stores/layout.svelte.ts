@@ -107,6 +107,29 @@ class LayoutStore {
     await sessions.close(sid);
   }
 
+  /** Échange la position de deux panes (drag & drop pour réarranger les chats). */
+  swap(nodeIdA: string, nodeIdB: string) {
+    if (!this.root || nodeIdA === nodeIdB) return;
+    let sidA: string | null = null;
+    let sidB: string | null = null;
+    const find = (n: Node) => {
+      if (n.kind === "leaf") {
+        if (n.nodeId === nodeIdA) sidA = n.sid;
+        if (n.nodeId === nodeIdB) sidB = n.sid;
+      } else {
+        find(n.a);
+        find(n.b);
+      }
+    };
+    find(this.root);
+    if (sidA === null || sidB === null) return;
+    this.root = mapTree(this.root, (n) => {
+      if (n.kind === "leaf" && n.nodeId === nodeIdA) return { ...n, sid: sidB! };
+      if (n.kind === "leaf" && n.nodeId === nodeIdB) return { ...n, sid: sidA! };
+      return n;
+    });
+  }
+
   /** Ajoute un pane à la racine (split horizontal). */
   async addRoot() {
     if (!this.root) {

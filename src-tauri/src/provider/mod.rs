@@ -23,8 +23,10 @@ pub struct TurnConfig {
     pub resume: bool,
     /// Répertoire de travail optionnel.
     pub cwd: Option<String>,
-    /// Modèle optionnel (alias sonnet/opus/haiku ou id complet).
+    /// Modèle optionnel (alias sonnet/opus/haiku/fable ou id complet).
     pub model: Option<String>,
+    /// Effort de raisonnement optionnel (low/medium/high/xhigh/max).
+    pub effort: Option<String>,
     /// Token OAuth injecté en env au spawn.
     pub token: String,
 }

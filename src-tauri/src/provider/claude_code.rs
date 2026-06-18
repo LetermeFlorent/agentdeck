@@ -53,6 +53,11 @@ async fn run_turn(app: tauri::AppHandle, cfg: TurnConfig, running: SharedChild) 
             cmd.arg("--model").arg(model);
         }
     }
+    if let Some(effort) = &cfg.effort {
+        if !effort.is_empty() {
+            cmd.arg("--effort").arg(effort);
+        }
+    }
     if let Some(cwd) = &cfg.cwd {
         if !cwd.is_empty() {
             cmd.current_dir(cwd);

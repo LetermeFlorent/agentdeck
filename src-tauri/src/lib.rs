@@ -108,6 +108,8 @@ fn session_send(
     mgr: tauri::State<'_, SessionManager>,
     id: String,
     text: String,
+    model: Option<String>,
+    effort: Option<String>,
 ) -> Result<(), String> {
     let token = auth::get_token().ok_or_else(|| "Non connecté (aucun token).".to_string())?;
     let handles = mgr
@@ -119,7 +121,9 @@ fn session_send(
         prompt: text,
         resume: handles.started,
         cwd: handles.cwd,
-        model: handles.model,
+        // Choix du pane (modèle/effort) prioritaire ; repli sur la config de session.
+        model: model.or(handles.model),
+        effort,
         token,
     };
     ClaudeCodeProvider.start_turn(app, cfg, handles.running);

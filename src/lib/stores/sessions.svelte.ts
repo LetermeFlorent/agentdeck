@@ -15,6 +15,7 @@ export interface SessionState {
   id: string;
   title: string;
   model: string | null;
+  effort: string | null;
   messages: Msg[];
   streaming: boolean;
   error: string | null;
@@ -24,6 +25,7 @@ export interface PersistedSession {
   id: string;
   title: string;
   model: string | null;
+  effort: string | null;
   messages: Msg[];
 }
 
@@ -43,6 +45,7 @@ class SessionsStore {
       id,
       title: opts.title ?? "Claude",
       model: opts.model ?? null,
+      effort: null,
       messages: [],
       streaming: false,
       error: null,
@@ -66,6 +69,7 @@ class SessionsStore {
         id: p.id,
         title: p.title,
         model: p.model,
+        effort: p.effort ?? null,
         messages: p.messages,
         streaming: false,
         error: null,
@@ -79,8 +83,23 @@ class SessionsStore {
       id: s.id,
       title: s.title,
       model: s.model,
+      effort: s.effort,
       messages: s.messages,
     }));
+  }
+
+  /** Change le modèle / l'effort d'un pane (appliqué au prochain tour). */
+  setModel(id: string, model: string) {
+    const s = this.map[id];
+    if (!s) return;
+    s.model = model || null;
+    this.touch();
+  }
+  setEffort(id: string, effort: string) {
+    const s = this.map[id];
+    if (!s) return;
+    s.effort = effort || null;
+    this.touch();
   }
 
   async send(id: string, text: string) {
@@ -90,7 +109,7 @@ class SessionsStore {
     s.messages.push({ role: "user", text, tools: [] });
     this.touch();
     try {
-      await ipc.sessionSend(id, text);
+      await ipc.sessionSend(id, text, s.model, s.effort);
     } catch (err) {
       s.error = String(err);
     }

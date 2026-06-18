@@ -1,6 +1,8 @@
 <script lang="ts">
   import { auth } from "$lib/stores/auth.svelte";
   import Icon from "./Icon.svelte";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
 
   let busy = $state(false);
   let error = $state<string | null>(null);
@@ -21,7 +23,7 @@
 </script>
 
 <div class="wrap">
-  <div class="card">
+  <div class="card" in:fly={{ y: 12, duration: 320, easing: cubicOut }}>
     <div class="brand">
       <div class="dot"></div>
       <h1>agentdeck</h1>
@@ -142,10 +144,11 @@
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--surface-2);
-    transition: border-color var(--transition), background var(--transition);
+    transition: border-color var(--transition), background var(--transition), transform var(--transition);
   }
   .opt:hover:not(:disabled) {
     border-color: var(--accent);
+    transform: translateY(-1px);
   }
   .opt-ic {
     color: var(--accent);

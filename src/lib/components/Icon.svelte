@@ -55,6 +55,15 @@
   {:else if name === "terminal"}
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <path d="M7 9l3 3-3 3M13 15h4" />
+  {:else if name === "grip"}
+    <g fill="currentColor" stroke="none">
+      <circle cx="9" cy="6" r="1.4" />
+      <circle cx="15" cy="6" r="1.4" />
+      <circle cx="9" cy="12" r="1.4" />
+      <circle cx="15" cy="12" r="1.4" />
+      <circle cx="9" cy="18" r="1.4" />
+      <circle cx="15" cy="18" r="1.4" />
+    </g>
   {/if}
 </svg>
 

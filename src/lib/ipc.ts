@@ -66,8 +66,12 @@ export const sessionRestore = (s: {
     cwd: s.cwd ?? null,
     model: s.model ?? null,
   });
-export const sessionSend = (id: string, text: string) =>
-  invoke<void>("session_send", { id, text });
+export const sessionSend = (
+  id: string,
+  text: string,
+  model?: string | null,
+  effort?: string | null,
+) => invoke<void>("session_send", { id, text, model: model ?? null, effort: effort ?? null });
 export const sessionStop = (id: string) => invoke<void>("session_stop", { id });
 export const sessionClose = (id: string) => invoke<void>("session_close", { id });
 

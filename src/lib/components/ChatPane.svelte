@@ -1,25 +1,46 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
   import Icon from "./Icon.svelte";
+  import { fly } from "svelte/transition";
 
   let {
     sid,
+    nodeId,
     onsplit,
     onclose,
+    onmove,
   }: {
     sid: string;
+    nodeId: string;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
+    onmove: (fromNodeId: string) => void;
   } = $props();
 
   let draft = $state("");
+  let dragOver = $state(false);
   let scroller: HTMLDivElement;
 
   const session = $derived(sessions.map[sid]);
 
+  const MODELS = [
+    { v: "", l: "Modèle" },
+    { v: "opus", l: "Opus" },
+    { v: "sonnet", l: "Sonnet" },
+    { v: "haiku", l: "Haiku" },
+    { v: "fable", l: "Fable" },
+  ];
+  const EFFORTS = [
+    { v: "", l: "Effort" },
+    { v: "low", l: "Low" },
+    { v: "medium", l: "Medium" },
+    { v: "high", l: "High" },
+    { v: "xhigh", l: "Xhigh" },
+    { v: "max", l: "Max" },
+  ];
+
   // Autoscroll vers le bas quand le contenu change (cap scroll : conteneur borné).
   $effect(() => {
-    // dépendances : nombre de messages + texte du dernier
     const msgs = session?.messages;
     void msgs?.length;
     void msgs?.[msgs.length - 1]?.text;
@@ -35,18 +56,48 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      submit(e);
-    }
+    if (e.key === "Enter" && !e.shiftKey) submit(e);
+  }
+
+  // --- Drag & drop pour réarranger les chats ---
+  function dragStart(e: DragEvent) {
+    e.dataTransfer?.setData("text/plain", nodeId);
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  }
+  function dragOverH(e: DragEvent) {
+    e.preventDefault();
+    dragOver = true;
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  }
+  function dropH(e: DragEvent) {
+    e.preventDefault();
+    dragOver = false;
+    const from = e.dataTransfer?.getData("text/plain");
+    if (from && from !== nodeId) onmove(from);
   }
 </script>
 
-<div class="pane">
+<div
+  class="pane"
+  class:drag-over={dragOver}
+  role="group"
+  ondragover={dragOverH}
+  ondragleave={() => (dragOver = false)}
+  ondrop={dropH}
+>
   <header class="pane-head">
-    <div class="title">
+    <div
+      class="title"
+      role="button"
+      tabindex="0"
+      aria-label="Glisser pour déplacer ce chat"
+      draggable="true"
+      ondragstart={dragStart}
+      title="Glisser pour déplacer ce chat"
+    >
+      <span class="grip"><Icon name="grip" size={14} /></span>
       <span class="status" class:live={session?.streaming}></span>
       <span class="name">{session?.title ?? "Claude"}</span>
-      {#if session?.model}<span class="model">{session.model}</span>{/if}
     </div>
     <div class="actions">
       {#if session?.streaming}
@@ -74,11 +125,11 @@
         <span>Écris une instruction pour démarrer.</span>
       </div>
     {/if}
-    {#each session?.messages ?? [] as msg}
-      <div class="msg {msg.role}">
+    {#each session?.messages ?? [] as msg, i (i)}
+      <div class="msg {msg.role}" in:fly={{ y: 6, duration: 160 }}>
         {#if msg.role === "assistant" && msg.tools.length}
           <div class="tools">
-            {#each msg.tools as t}<span class="tool">⚙ {t}</span>{/each}
+            {#each msg.tools as t}<span class="tool" in:fly={{ y: 4, duration: 140 }}>⚙ {t}</span>{/each}
           </div>
         {/if}
         {#if msg.text}
@@ -89,11 +140,27 @@
       </div>
     {/each}
     {#if session?.error}
-      <div class="msg-error">{session.error}</div>
+      <div class="msg-error" in:fly={{ y: 6, duration: 160 }}>{session.error}</div>
     {/if}
   </div>
 
   <form class="composer" onsubmit={submit}>
+    <select
+      class="sel"
+      title="Modèle"
+      value={session?.model ?? ""}
+      onchange={(e) => sessions.setModel(sid, e.currentTarget.value)}
+    >
+      {#each MODELS as m}<option value={m.v}>{m.l}</option>{/each}
+    </select>
+    <select
+      class="sel"
+      title="Effort de raisonnement"
+      value={session?.effort ?? ""}
+      onchange={(e) => sessions.setEffort(sid, e.currentTarget.value)}
+    >
+      {#each EFFORTS as ef}<option value={ef.v}>{ef.l}</option>{/each}
+    </select>
     <textarea
       placeholder="Message à Claude…  (Entrée pour envoyer)"
       bind:value={draft}
@@ -105,7 +172,7 @@
       type="submit"
       disabled={!draft.trim() || session?.streaming}
       title="Envoyer"
-    ><Icon name="send" size={17} /></button>
+    ><Icon name="send" size={16} /></button>
   </form>
 </div>
 
@@ -119,44 +186,68 @@
     overflow: hidden;
     min-width: 0;
     min-height: 0;
+    transition: border-color var(--transition), box-shadow var(--transition);
+  }
+  .pane.drag-over {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
   }
   .pane-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 9px 7px 12px;
+    padding: 4px 7px 4px 6px;
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
   }
+  /* header de chat compact (–20%) : boutons d'action plus petits */
+  .actions :global(.icon-btn) {
+    width: 23px;
+    height: 23px;
+  }
   .title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
+    flex: 1;
     min-width: 0;
+    cursor: grab;
+    padding: 3px 4px;
+    border-radius: 5px;
+    transition: background var(--transition);
+  }
+  .title:hover {
+    background: var(--elevated);
+  }
+  .title:active {
+    cursor: grabbing;
+  }
+  .grip {
+    color: var(--text-faint);
+    display: flex;
   }
   .status {
     width: 7px;
     height: 7px;
     border-radius: 50%;
     background: var(--text-faint);
+    transition: background var(--transition), box-shadow var(--transition);
   }
   .status.live {
     background: var(--good);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent);
+    animation: pulseDot 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 22%, transparent); }
+    50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 10%, transparent); }
   }
   .name {
     font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: -0.01em;
-  }
-  .model {
-    font-size: 10.5px;
-    color: var(--text-muted);
-    background: var(--elevated);
-    border-radius: 4px;
-    padding: 1px 6px;
   }
   .actions {
     display: flex;
@@ -185,6 +276,11 @@
   .empty-icon {
     color: var(--text-faint);
     margin-bottom: 6px;
+    animation: floaty 3.5s ease-in-out infinite;
+  }
+  @keyframes floaty {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
   }
   .empty p {
     margin: 0;
@@ -248,12 +344,8 @@
     background: var(--text-faint);
     animation: blink 1.2s infinite both;
   }
-  .typing span:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-  .typing span:nth-child(3) {
-    animation-delay: 0.4s;
-  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink {
     0%, 80%, 100% { opacity: 0.25; }
     40% { opacity: 1; }
@@ -267,37 +359,65 @@
     padding: 8px 10px;
     white-space: pre-wrap;
   }
+
+  /* Composer (–15%) : modèle, effort, saisie et envoi sur une seule ligne */
   .composer {
     display: flex;
     align-items: flex-end;
-    gap: 8px;
-    padding: 10px;
+    gap: 6px;
+    padding: 6px;
     border-top: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
   }
+  .sel {
+    appearance: none;
+    flex-shrink: 0;
+    height: 28px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 0 8px;
+    border-radius: var(--radius-sm);
+    outline: none;
+    cursor: pointer;
+    transition: border-color var(--transition), color var(--transition);
+  }
+  .sel:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+  .sel:focus {
+    border-color: var(--accent);
+  }
   textarea {
     flex: 1;
     resize: none;
-    max-height: 140px;
-    padding: 9px 11px;
+    max-height: 110px;
+    padding: 5px 9px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--bg);
-    font-size: 13px;
-    line-height: 1.4;
+    font-size: 12.5px;
+    line-height: 1.35;
     outline: none;
+    transition: border-color var(--transition);
   }
   textarea:focus {
     border-color: var(--accent);
   }
   .send {
-    width: 36px;
-    height: 36px;
+    width: 33px;
+    height: 33px;
     padding: 0;
     justify-content: center;
-    font-size: 16px;
     flex-shrink: 0;
+    transition: background var(--transition), transform var(--transition);
+  }
+  .send:not(:disabled):active {
+    transform: scale(0.92);
   }
   .send:disabled {
     opacity: 0.4;
