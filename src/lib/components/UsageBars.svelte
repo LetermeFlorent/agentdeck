@@ -11,27 +11,43 @@
     if (pct >= 70) return "var(--warn)";
     return "var(--accent)";
   }
+  // Compte à rebours avant réinitialisation de la fenêtre.
+  function resetIn(epoch: number | null): string {
+    if (!epoch) return "";
+    const s = epoch - Math.floor(Date.now() / 1000);
+    if (s <= 0) return "réinit imminente";
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `réinit dans ${h}h${String(m).padStart(2, "0")}` : `réinit dans ${m}min`;
+  }
+  function tip(label: string, b: { pct: number; tokens: number; cap: number; resets_at: number | null }, cost: number, real: boolean): string {
+    if (real) return `${label} : ${b.pct}% utilisé · ${resetIn(b.resets_at)} · $${cost.toFixed(2)} via l'app`;
+    return `${label} : ${fmt(b.tokens)}/${fmt(b.cap)} tokens (estimé) · $${cost.toFixed(2)}`;
+  }
 </script>
 
 <div class="usage">
   {#if usage.snapshot}
     {@const s = usage.snapshot}
-    <div class="row" title={`${fmt(s.five_h.tokens)} / ${fmt(s.five_h.cap)} tokens · $${s.five_h_cost.toFixed(2)} sur 5h`}>
+    {@const real = s.source === "real"}
+    <div class="row" title={tip("5h", s.five_h, s.five_h_cost, real)}>
       <span class="lbl">5h</span>
       <div class="track">
         <div class="fill" style={`width:${s.five_h.pct}%;background:${tone(s.five_h.pct)}`}></div>
       </div>
       <span class="pct">{s.five_h.pct}%</span>
     </div>
-    <div class="row" title={`${fmt(s.week.tokens)} / ${fmt(s.week.cap)} tokens · $${s.week_cost.toFixed(2)} sur 7j`}>
+    <div class="row" title={tip("7j", s.week, s.week_cost, real)}>
       <span class="lbl">7j</span>
       <div class="track">
         <div class="fill" style={`width:${s.week.pct}%;background:${tone(s.week.pct)}`}></div>
       </div>
       <span class="pct">{s.week.pct}%</span>
     </div>
-    {#if s.source === "estimated"}
-      <span class="src" title="Aucune API publique ne donne les vrais % d'abonnement — valeur estimée localement (tokens consommés via l'app).">estimé</span>
+    {#if real}
+      <span class="src real" title="Vraies limites d'abonnement (5h / 7j) lues depuis claude-statusbar.">réel</span>
+    {:else}
+      <span class="src" title="Pas de donnée réelle dispo (claude-statusbar absent) — estimation locale des tokens consommés via l'app.">estimé</span>
     {/if}
   {/if}
 </div>
@@ -79,5 +95,10 @@
     border-radius: 4px;
     padding: 1px 5px;
     cursor: help;
+  }
+  .src.real {
+    color: var(--accent);
+    border-color: var(--accent-weak);
+    background: var(--accent-weak);
   }
 </style>

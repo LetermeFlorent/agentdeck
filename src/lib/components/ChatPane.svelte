@@ -8,7 +8,7 @@
     onclose,
   }: {
     sid: string;
-    onsplit: (dir: "row" | "col") => void;
+    onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
   } = $props();
 
@@ -54,7 +54,7 @@
           <Icon name="stop" size={15} />
         </button>
       {/if}
-      <button class="icon-btn" title="Diviser horizontalement (haut / bas)" onclick={() => onsplit("col")}>
+      <button class="icon-btn" title="Diviser horizontalement (haut / bas)" onclick={() => onsplit("column")}>
         <Icon name="split-v" />
       </button>
       <button class="icon-btn" title="Diviser verticalement (côte à côte)" onclick={() => onsplit("row")}>

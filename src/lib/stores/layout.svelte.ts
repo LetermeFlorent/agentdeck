@@ -1,9 +1,9 @@
 // Store de disposition : arbre de tiling récursif. Chaque feuille = un pane lié à une session.
-// Split "row" = côte à côte (axe X), "col" = empilé (axe Y).
+// Dir = valeur CSS flex-direction directe : "row" = côte à côte, "column" = empilé (haut/bas).
 
 import { sessions } from "./sessions.svelte";
 
-export type Dir = "row" | "col";
+export type Dir = "row" | "column";
 
 export interface LeafNode {
   kind: "leaf";
@@ -29,6 +29,15 @@ function syncCounter(node: Node) {
   if (node.kind === "split") {
     syncCounter(node.a);
     syncCounter(node.b);
+  }
+}
+
+/** Migre les anciens arbres persistés (dir "col" → "column" CSS valide). */
+function migrateDirs(node: Node) {
+  if (node.kind === "split") {
+    if ((node.dir as string) === "col") node.dir = "column";
+    migrateDirs(node.a);
+    migrateDirs(node.b);
   }
 }
 
@@ -64,7 +73,10 @@ class LayoutStore {
 
   /** Restaure un arbre persité (les sessions correspondantes doivent déjà être hydratées). */
   restore(root: Node | null) {
-    if (root) syncCounter(root);
+    if (root) {
+      migrateDirs(root);
+      syncCounter(root);
+    }
     this.root = root;
   }
 

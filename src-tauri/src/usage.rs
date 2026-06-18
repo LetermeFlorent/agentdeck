@@ -51,6 +51,8 @@ pub struct Bar {
     pub tokens: u64,
     pub cap: u64,
     pub pct: u32,
+    /// Epoch (s) de réinitialisation de la fenêtre, si connu (source réelle).
+    pub resets_at: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -105,7 +107,53 @@ fn bar(tokens: u64, cap: u64) -> Bar {
     } else {
         ((tokens as f64 / cap as f64) * 100.0).round().min(100.0) as u32
     };
-    Bar { tokens, cap, pct }
+    Bar {
+        tokens,
+        cap,
+        pct,
+        resets_at: None,
+    }
+}
+
+fn bar_pct(used_pct: f64, resets_at: i64) -> Bar {
+    Bar {
+        tokens: 0,
+        cap: 0,
+        pct: used_pct.round().clamp(0.0, 100.0) as u32,
+        resets_at: Some(resets_at),
+    }
+}
+
+/// Vraies limites d'abonnement (5h / 7j) lues depuis le cache de claude-statusbar
+/// (`~/.cache/claude-statusbar/last_stdin.json`), que Claude Code met à jour à chaque
+/// tick de statusline. C'est la donnée officielle (used_percentage + resets_at).
+/// Retourne (five_hour, seven_day) en (used_pct, resets_at) si disponible et non périmé.
+fn real_rate_limits() -> Option<(Bar, Bar)> {
+    let mut p = dirs::home_dir()?;
+    p.push(".cache");
+    p.push("claude-statusbar");
+    p.push("last_stdin.json");
+    let raw = std::fs::read_to_string(p).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    let rl = v.get("rate_limits")?;
+
+    let read = |key: &str| -> Option<Bar> {
+        let w = rl.get(key)?;
+        let used = w.get("used_percentage").and_then(serde_json::Value::as_f64)?;
+        let resets = w
+            .get("resets_at")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
+        // Fenêtre déjà réinitialisée → la conso réelle est repartie à 0.
+        let used = if resets > 0 && (now() as i64) >= resets {
+            0.0
+        } else {
+            used
+        };
+        Some(bar_pct(used, resets))
+    };
+
+    Some((read("five_hour")?, read("seven_day")?))
 }
 
 /// Enregistre la conso d'un tour terminé (tous types de tokens + coût) et purge les entrées > 7j.
@@ -146,15 +194,28 @@ pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
     let five_h_cut = t.saturating_sub(FIVE_H_SECS);
     let week_cut = t.saturating_sub(WEEK_SECS);
     let in_window = |cut: u64| data.entries.iter().filter(move |e| e.ts >= cut);
-    let five_h_tokens: u64 = in_window(five_h_cut).map(|e| e.tokens).sum();
-    let week_tokens: u64 = in_window(week_cut).map(|e| e.tokens).sum();
     let five_h_cost: f64 = in_window(five_h_cut).map(|e| e.cost).sum();
     let week_cost: f64 = in_window(week_cut).map(|e| e.cost).sum();
-    UsageSnapshot {
-        five_h: bar(five_h_tokens, data.five_h_cap),
-        week: bar(week_tokens, data.week_cap),
-        five_h_cost,
-        week_cost,
-        source: "estimated".into(),
+
+    // Préférence : vraies limites d'abonnement (claude-statusbar). Repli : comptage local.
+    match real_rate_limits() {
+        Some((five_h, week)) => UsageSnapshot {
+            five_h,
+            week,
+            five_h_cost,
+            week_cost,
+            source: "real".into(),
+        },
+        None => {
+            let five_h_tokens: u64 = in_window(five_h_cut).map(|e| e.tokens).sum();
+            let week_tokens: u64 = in_window(week_cut).map(|e| e.tokens).sum();
+            UsageSnapshot {
+                five_h: bar(five_h_tokens, data.five_h_cap),
+                week: bar(week_tokens, data.week_cap),
+                five_h_cost,
+                week_cost,
+                source: "estimated".into(),
+            }
+        }
     }
 }

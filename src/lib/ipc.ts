@@ -15,6 +15,7 @@ export interface Bar {
   tokens: number;
   cap: number;
   pct: number;
+  resets_at: number | null;
 }
 
 export interface UsageSnapshot {
