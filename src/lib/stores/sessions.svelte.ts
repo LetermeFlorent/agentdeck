@@ -22,6 +22,8 @@ export interface SessionState {
   error: string | null;
   collapsed: boolean;
   priv: boolean;
+  /** Messages tapés pendant que Claude travaille : envoyés l'un après l'autre. */
+  queue: string[];
 }
 
 export interface PersistedSession {
@@ -85,6 +87,7 @@ class SessionsStore {
       error: null,
       collapsed: false,
       priv: false,
+      queue: [],
     };
     await this.attach(id);
     this.touch();
@@ -111,6 +114,7 @@ class SessionsStore {
         error: null,
         collapsed: p.collapsed ?? false,
         priv: p.priv ?? false,
+        queue: [],
       };
       await this.attach(p.id);
     }
@@ -168,12 +172,30 @@ class SessionsStore {
 
   async send(id: string, text: string) {
     const s = this.map[id];
-    if (!s || s.streaming) return;
+    if (!s) return;
     s.error = null;
     s.messages.push({ role: "user", text, tools: [] });
     this.touch();
+    // Claude travaille déjà → on met en file (1 process/tour : on n'en lance pas un 2e).
+    if (s.streaming || s.queue.length > 0) {
+      s.queue.push(text);
+      return;
+    }
     try {
       await ipc.sessionSend(id, text, s.model, s.effort);
+    } catch (err) {
+      s.error = String(err);
+    }
+  }
+
+  /** Envoie le prochain message en file, une fois le tour précédent terminé. */
+  private async drain(id: string) {
+    const s = this.map[id];
+    if (!s || s.streaming || s.queue.length === 0) return;
+    const next = s.queue.shift()!;
+    this.touch();
+    try {
+      await ipc.sessionSend(id, next, s.model, s.effort);
     } catch (err) {
       s.error = String(err);
     }
@@ -245,6 +267,8 @@ class SessionsStore {
         break;
       case "exited":
         s.streaming = false;
+        // Tour terminé → on envoie le message suivant en file s'il y en a.
+        this.drain(id);
         break;
     }
   }

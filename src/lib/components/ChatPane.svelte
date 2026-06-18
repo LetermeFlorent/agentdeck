@@ -58,8 +58,11 @@
     { v: "xhigh", l: "Xhigh" },
     { v: "max", l: "Max" },
   ];
+  // Ultracode : exclusif Opus (mappé sur --effort xhigh côté CLI).
+  const ULTRACODE = { v: "ultracode", l: "Ultracode" };
 
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
+  const efforts = $derived(session?.model === "opus" ? [...EFFORTS, ULTRACODE] : EFFORTS);
 
   // Autoscroll vers le bas quand le contenu change (cap scroll : conteneur borné).
   $effect(() => {
@@ -72,8 +75,9 @@
   function submit(e: Event) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text || !session || session.streaming) return;
+    if (!text || !session) return;
     draft = "";
+    // Envoi possible même si Claude travaille : ça part en file d'attente.
     sessions.send(sid, text);
   }
 
@@ -223,7 +227,7 @@
       />
       <Dropdown
         label="Effort"
-        options={EFFORTS}
+        options={efforts}
         value={session?.effort ?? ""}
         onchange={(v) => sessions.setEffort(sid, v)}
       />
@@ -235,11 +239,14 @@
         onkeydown={onKey}
         rows="1"
       ></textarea>
+      {#if (session?.queue?.length ?? 0) > 0}
+        <span class="qchip" use:tooltip={"Messages en file (envoyés l'un après l'autre)"}>{session.queue.length}</span>
+      {/if}
       <button
         class="send"
         type="submit"
-        disabled={!draft.trim() || session?.streaming}
-        use:tooltip={"Envoyer (Entrée)"}
+        disabled={!draft.trim()}
+        use:tooltip={session?.streaming ? "Mettre en file (Claude travaille)" : "Envoyer (Entrée)"}
       ><Icon name="send" size={15} /></button>
     </form>
   </div>
@@ -584,6 +591,21 @@
   }
   textarea::placeholder {
     color: var(--text-faint);
+  }
+  .qchip {
+    flex-shrink: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: var(--accent);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
   }
   .send {
     display: inline-flex;

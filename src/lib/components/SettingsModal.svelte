@@ -40,6 +40,7 @@
     tabindex="-1"
     transition:fly={{ y: 12, duration: 200, easing: cubicOut }}
     onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => e.stopPropagation()}
   >
     <header class="m-head">
       <span class="m-title">Paramètres</span>

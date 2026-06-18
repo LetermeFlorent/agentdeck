@@ -70,7 +70,9 @@ async fn run_turn(app: tauri::AppHandle, cfg: TurnConfig, running: SharedChild) 
     }
     if let Some(effort) = &cfg.effort {
         if !effort.is_empty() {
-            cmd.arg("--effort").arg(effort);
+            // "ultracode" (libellé Opus) n'est pas un --effort valide → mappé sur xhigh.
+            let level = if effort == "ultracode" { "xhigh" } else { effort.as_str() };
+            cmd.arg("--effort").arg(level);
         }
     }
     if let Some(cwd) = &cfg.cwd {
