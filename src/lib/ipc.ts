@@ -35,7 +35,7 @@ export type SessionEvent =
   | { kind: "tool_use"; name: string }
   | { kind: "tool_result"; ok: boolean }
   | { kind: "progress"; output_tokens: number }
-  | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number }
+  | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number; context_tokens: number; context_window: number }
   | { kind: "error"; message: string }
   | { kind: "exited"; code: number | null };
 

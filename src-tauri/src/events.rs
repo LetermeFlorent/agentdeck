@@ -18,12 +18,17 @@ pub enum SessionEvent {
     ToolUse { name: String },
     /// Progression du tour : tokens de sortie cumulés (pour l'indicateur live).
     Progress { output_tokens: u64 },
-    /// Fin du tour : tokens du tour + coût cumulé de la session (USD).
+    /// Fin du tour : tokens du tour + coût cumulé (USD) + taille du contexte courant.
     TurnDone {
         input_tokens: u64,
         output_tokens: u64,
         total_tokens: u64,
         cost_usd: f64,
+        /// Tokens de prompt du dernier tour (input + cache) = remplissage du contexte.
+        context_tokens: u64,
+        /// Taille de la fenêtre de contexte du modèle, rapportée par Claude Code
+        /// (`modelUsage.<model>.contextWindow`). Dynamique : 200k, 1M… ; 0 si inconnue.
+        context_window: u64,
     },
     /// Erreur (spawn, parse, auth…).
     Error { message: String },

@@ -262,12 +262,26 @@ fn handle_line(app: &tauri::AppHandle, id: &str, v: &Value) {
             };
             let input = tok("input_tokens");
             let output = tok("output_tokens");
-            let total =
-                input + output + tok("cache_creation_input_tokens") + tok("cache_read_input_tokens");
+            let cache = tok("cache_creation_input_tokens") + tok("cache_read_input_tokens");
+            // Contexte courant = prompt du dernier tour (entrée + cache), sans la sortie.
+            let context = input + cache;
+            let total = input + output + cache;
             let cost = v
                 .get("total_cost_usd")
                 .and_then(Value::as_f64)
                 .unwrap_or(0.0);
+            // Fenêtre de contexte réelle du modèle (dynamique) : max des contextWindow
+            // rapportés dans modelUsage (un tour peut toucher plusieurs modèles).
+            let context_window = v
+                .get("modelUsage")
+                .and_then(Value::as_object)
+                .map(|m| {
+                    m.values()
+                        .filter_map(|mu| mu.get("contextWindow").and_then(Value::as_u64))
+                        .max()
+                        .unwrap_or(0)
+                })
+                .unwrap_or(0);
             usage::record(app.state::<usage::UsageStore>().inner(), total, cost);
             emit(
                 app,
@@ -277,6 +291,8 @@ fn handle_line(app: &tauri::AppHandle, id: &str, v: &Value) {
                     output_tokens: output,
                     total_tokens: total,
                     cost_usd: cost,
+                    context_tokens: context,
+                    context_window,
                 },
             );
         }

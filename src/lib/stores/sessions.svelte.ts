@@ -32,6 +32,10 @@ export interface SessionState {
   totalTokens: number;
   /** Coût cumulé du chat (USD). */
   costUsd: number;
+  /** Remplissage du contexte au dernier tour (entrée + cache) = jauge de contexte. */
+  contextTokens: number;
+  /** Fenêtre de contexte réelle du modèle (rapportée par Claude Code) ; 0 si inconnue. */
+  contextWindow: number;
 }
 
 export interface PersistedSession {
@@ -42,6 +46,11 @@ export interface PersistedSession {
   messages: Msg[];
   collapsed?: boolean;
   priv?: boolean;
+  /** Cumuls conservés entre deux lancements (coût/tokens affichés dans l'entête). */
+  totalTokens?: number;
+  costUsd?: number;
+  contextTokens?: number;
+  contextWindow?: number;
 }
 
 class SessionsStore {
@@ -122,6 +131,8 @@ class SessionsStore {
       turnTokens: 0,
       totalTokens: 0,
       costUsd: 0,
+      contextTokens: 0,
+      contextWindow: 0,
     };
     await this.attach(id);
     this.touch();
@@ -151,8 +162,10 @@ class SessionsStore {
         queue: [],
         turnStart: null,
         turnTokens: 0,
-        totalTokens: 0,
-        costUsd: 0,
+        totalTokens: p.totalTokens ?? 0,
+        costUsd: p.costUsd ?? 0,
+        contextTokens: p.contextTokens ?? 0,
+        contextWindow: p.contextWindow ?? 0,
       };
       await this.attach(p.id);
     }
@@ -167,6 +180,10 @@ class SessionsStore {
       messages: s.messages,
       collapsed: s.collapsed,
       priv: s.priv,
+      totalTokens: s.totalTokens,
+      costUsd: s.costUsd,
+      contextTokens: s.contextTokens,
+      contextWindow: s.contextWindow,
     }));
   }
 
@@ -297,6 +314,10 @@ class SessionsStore {
         s.streaming = false;
         s.turnStart = null;
         s.totalTokens += e.total_tokens;
+        // Remplissage du contexte = prompt du dernier tour (remplace, pas de cumul).
+        s.contextTokens = e.context_tokens;
+        // Fenêtre réelle du modèle (dynamique) ; on garde la dernière valeur connue.
+        if (e.context_window > 0) s.contextWindow = e.context_window;
         // total_cost_usd est cumulatif par process → on prend la dernière valeur.
         if (e.cost_usd >= s.costUsd || e.cost_usd === 0) s.costUsd = e.cost_usd || s.costUsd;
         else s.costUsd = e.cost_usd; // process relancé (modèle changé) → réinitialisé

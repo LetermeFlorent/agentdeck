@@ -82,6 +82,44 @@
   };
   const price = $derived(PRICES[session?.model ?? "opus"] ?? null);
 
+  // --- Jauge de contexte (façon /context de Claude) ---
+  // Fenêtre = valeur réelle rapportée par Claude Code (modelUsage.contextWindow),
+  // donc dynamique selon le modèle / mode (200k, 1M…) — aucune valeur en dur.
+  const R = 8; // rayon du cercle (donut SVG)
+  const CIRC = 2 * Math.PI * R; // circonférence
+  const ctxWindow = $derived(session?.contextWindow ?? 0);
+  const ctxKnown = $derived(ctxWindow > 0);
+  const ctxUsed = $derived(session?.contextTokens ?? 0);
+  const ctxPct = $derived(ctxKnown ? Math.min(100, Math.round((ctxUsed / ctxWindow) * 100)) : 0);
+  const ctxFree = $derived(Math.max(0, ctxWindow - ctxUsed));
+  // Longueur de l'arc rempli (le reste = contexte libre).
+  const ctxDash = $derived((CIRC * ctxPct) / 100);
+  const ctxTone = $derived(
+    ctxPct >= 90 ? "var(--danger)" : ctxPct >= 70 ? "var(--warn)" : "var(--good)",
+  );
+  let ctxOpen = $state(false);
+  let ctxRoot = $state<HTMLDivElement>();
+  // Ferme le panneau de contexte au clic extérieur / Échap (même UX que les dropdowns).
+  $effect(() => {
+    if (!ctxOpen) return;
+    const onDown = (e: PointerEvent) => {
+      if (ctxRoot && !ctxRoot.contains(e.target as Node)) ctxOpen = false;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") ctxOpen = false;
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  });
+  // Formatage tokens complet (séparateur de milliers) pour le panneau détaillé.
+  function fmtFull(n: number): string {
+    return n.toLocaleString("fr-FR");
+  }
+
   // Indicateur de réflexion (façon Claude Code) : spinner + secondes + tokens.
   const FRAMES = ["✶", "✸", "✹", "✺", "✹", "✷"];
   const VERBS = ["Réflexion", "Cogitation", "Mijotage", "Élucubration", "Tergiversation"];
@@ -373,6 +411,61 @@
         use:tooltip={session?.streaming ? "Envoyer (pris en cours de route)" : "Envoyer (Entrée)"}
       ><Icon name="send" size={13} /></button>
     </form>
+
+    <!-- Jauge de contexte : se remplit selon le contexte consommé, cliquable pour le détail. -->
+    <div class="ctx" bind:this={ctxRoot}>
+      <button
+        type="button"
+        class="ctx-gauge"
+        class:open={ctxOpen}
+        aria-label="Contexte utilisé"
+        use:tooltip={ctxKnown ? `Contexte : ${ctxPct}% utilisé — clic pour le détail` : "Contexte — clic pour le détail (mesuré au 1er tour)"}
+        onclick={() => (ctxOpen = !ctxOpen)}
+      >
+        <svg viewBox="0 0 22 22" width="22" height="22">
+          <circle class="ctx-track" cx="11" cy="11" r={R} fill="none" stroke-width="3" />
+          <circle
+            cx="11"
+            cy="11"
+            r={R}
+            fill="none"
+            stroke={ctxTone}
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-dasharray={`${CIRC} ${CIRC}`}
+            stroke-dashoffset={CIRC - ctxDash}
+            transform="rotate(-90 11 11)"
+          />
+        </svg>
+      </button>
+
+      {#if ctxOpen}
+        <div class="ctx-pop" in:fly={{ y: 6, duration: 140 }}>
+          <div class="ctx-head">
+            <span class="ctx-title">Fenêtre de contexte</span>
+            <span class="ctx-big" style={`color:${ctxTone}`}>{ctxKnown ? `${ctxPct}%` : "—"}</span>
+          </div>
+          <div class="ctx-bar">
+            <div class="ctx-bar-fill" style={`width:${ctxPct}%;background:${ctxTone}`}></div>
+          </div>
+          <ul class="ctx-rows">
+            <li><span>Utilisé</span><b>{fmtFull(ctxUsed)}</b></li>
+            <li><span>Libre</span><b>{fmtFull(ctxFree)}</b></li>
+            <li class="muted"><span>Fenêtre</span><b>{ctxKnown ? fmtFull(ctxWindow) : "—"}</b></li>
+          </ul>
+          <div class="ctx-sep"></div>
+          <ul class="ctx-rows">
+            <li><span>Coût du chat</span><b>${(session?.costUsd ?? 0).toFixed(3)}</b></li>
+            <li><span>Tokens générés</span><b>{fmtFull(session?.totalTokens ?? 0)}</b></li>
+            {#if session?.model}<li class="muted"><span>Modèle</span><b>{session.model}</b></li>{/if}
+            {#if price}<li class="muted"><span>Tarif /M</span><b>↑${price[0]} ↓${price[1]}</b></li>{/if}
+          </ul>
+          {#if !ctxKnown}
+            <p class="ctx-note">Envoie un message — la fenêtre réelle du modèle est mesurée au 1er tour.</p>
+          {/if}
+        </div>
+      {/if}
+    </div>
   </div>
   {/if}
 </div>
@@ -850,5 +943,114 @@
   .send:disabled {
     opacity: 0.35;
     cursor: default;
+  }
+
+  /* --- Jauge de contexte (donut) + panneau détaillé --- */
+  .ctx {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+  }
+  .ctx-gauge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    transition: background var(--transition);
+  }
+  .ctx-gauge:hover {
+    background: var(--elevated);
+  }
+  .ctx-gauge.open {
+    background: var(--accent-weak);
+  }
+  .ctx-track {
+    stroke: var(--track);
+  }
+  .ctx-gauge svg circle {
+    transition: stroke-dashoffset var(--transition), stroke var(--transition);
+  }
+  .ctx-pop {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 6px);
+    width: 218px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+    padding: 11px 12px;
+    z-index: 40;
+  }
+  .ctx-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .ctx-title {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .ctx-big {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .ctx-bar {
+    height: 6px;
+    background: var(--track);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .ctx-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width var(--transition), background var(--transition);
+  }
+  .ctx-rows {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .ctx-rows li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .ctx-rows li span {
+    color: var(--text-muted);
+  }
+  .ctx-rows li b {
+    color: var(--text);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .ctx-rows li.muted b {
+    color: var(--text-faint);
+    font-weight: 500;
+  }
+  .ctx-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 9px 0;
+  }
+  .ctx-note {
+    margin: 9px 0 0;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    line-height: 1.4;
   }
 </style>
