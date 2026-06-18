@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
+  import Icon from "./Icon.svelte";
 
   let {
     sid,
@@ -49,18 +50,27 @@
     </div>
     <div class="actions">
       {#if session?.streaming}
-        <button class="icon-btn" title="Arrêter" onclick={() => sessions.stop(sid)}>■</button>
+        <button class="icon-btn" title="Arrêter" onclick={() => sessions.stop(sid)}>
+          <Icon name="stop" size={15} />
+        </button>
       {/if}
-      <button class="icon-btn" title="Scinder à droite (axe X)" onclick={() => onsplit("row")}>⊟</button>
-      <button class="icon-btn" title="Scinder en bas (axe Y)" onclick={() => onsplit("col")}>⊞</button>
-      <button class="icon-btn close" title="Fermer le pane" onclick={onclose}>✕</button>
+      <button class="icon-btn" title="Diviser horizontalement (haut / bas)" onclick={() => onsplit("col")}>
+        <Icon name="split-v" />
+      </button>
+      <button class="icon-btn" title="Diviser verticalement (côte à côte)" onclick={() => onsplit("row")}>
+        <Icon name="split-h" />
+      </button>
+      <button class="icon-btn close" title="Fermer le pane" onclick={onclose}>
+        <Icon name="close" />
+      </button>
     </div>
   </header>
 
   <div class="messages" bind:this={scroller}>
     {#if !session || session.messages.length === 0}
       <div class="empty">
-        <p>Nouvelle session Claude Code.</p>
+        <div class="empty-icon"><Icon name="terminal" size={26} stroke={1.6} /></div>
+        <p>Nouvelle session Claude Code</p>
         <span>Écris une instruction pour démarrer.</span>
       </div>
     {/if}
@@ -95,7 +105,7 @@
       type="submit"
       disabled={!draft.trim() || session?.streaming}
       title="Envoyer"
-    >↑</button>
+    ><Icon name="send" size={17} /></button>
   </form>
 </div>
 
@@ -106,7 +116,6 @@
     height: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
     overflow: hidden;
     min-width: 0;
     min-height: 0;
@@ -137,8 +146,10 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 25%, transparent);
   }
   .name {
-    font-size: 13px;
+    font-family: var(--font-mono);
+    font-size: 12px;
     font-weight: 600;
+    letter-spacing: -0.01em;
   }
   .model {
     font-size: 10.5px;
@@ -166,10 +177,20 @@
     margin: auto;
     text-align: center;
     color: var(--text-faint);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .empty-icon {
+    color: var(--text-faint);
+    margin-bottom: 6px;
   }
   .empty p {
-    margin: 0 0 4px;
+    margin: 0;
     color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
   }
   .empty span {
     font-size: 12.5px;

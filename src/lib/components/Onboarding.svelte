@@ -1,5 +1,6 @@
 <script lang="ts">
   import { auth } from "$lib/stores/auth.svelte";
+  import Icon from "./Icon.svelte";
 
   let busy = $state(false);
   let error = $state<string | null>(null);
@@ -30,20 +31,26 @@
     <div class="options">
       <!-- Voie A : connexion Anthropic de base -->
       <button class="opt" disabled={busy} onclick={() => run(() => auth.login())}>
-        <div class="opt-head">
-          <span class="opt-title">Se connecter à Anthropic</span>
-          <span class="badge">OAuth</span>
+        <div class="opt-ic"><Icon name="key" size={19} /></div>
+        <div class="opt-body">
+          <div class="opt-head">
+            <span class="opt-title">Se connecter à Anthropic</span>
+            <span class="badge">OAuth</span>
+          </div>
+          <span class="opt-desc">Ouvre le navigateur (claude setup-token) et stocke le token de façon sécurisée.</span>
         </div>
-        <span class="opt-desc">Ouvre le navigateur (claude setup-token) et stocke le token de façon sécurisée.</span>
       </button>
 
       <!-- Voie B : import du token -->
       <button class="opt" disabled={busy} onclick={() => run(() => auth.importFromDownloads())}>
-        <div class="opt-head">
-          <span class="opt-title">Importer le token</span>
-          <span class="badge">Téléchargements</span>
+        <div class="opt-ic"><Icon name="download" size={19} /></div>
+        <div class="opt-body">
+          <div class="opt-head">
+            <span class="opt-title">Importer le token</span>
+            <span class="badge">Téléchargements</span>
+          </div>
+          <span class="opt-desc">Lit claude-token.txt dans le dossier Téléchargements et l'enregistre dans le coffre Windows.</span>
         </div>
-        <span class="opt-desc">Lit claude-token.txt dans le dossier Téléchargements et l'enregistre dans le coffre Windows.</span>
       </button>
     </div>
 
@@ -76,6 +83,7 @@
     {/if}
 
     <p class="note">
+      <Icon name="lock" size={13} />
       Le token n'est jamais écrit en clair : il est chiffré dans le gestionnaire d'identifiants Windows.
     </p>
   </div>
@@ -86,34 +94,34 @@
     height: 100vh;
     display: grid;
     place-items: center;
-    background: radial-gradient(120% 120% at 50% 0%, var(--surface) 0%, var(--bg) 60%);
+    background: var(--bg);
     padding: 24px;
   }
   .card {
     width: 100%;
-    max-width: 440px;
+    max-width: 430px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow);
     padding: 30px;
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 11px;
+    gap: 10px;
   }
   .dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 4px;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
     background: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-weak);
   }
   h1 {
     margin: 0;
-    font-size: 22px;
-    letter-spacing: -0.02em;
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
   }
   .sub {
     color: var(--text-muted);
@@ -128,9 +136,9 @@
   .opt {
     text-align: left;
     display: flex;
-    flex-direction: column;
-    gap: 5px;
-    padding: 14px;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 13px 14px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--surface-2);
@@ -138,7 +146,17 @@
   }
   .opt:hover:not(:disabled) {
     border-color: var(--accent);
-    background: var(--elevated);
+  }
+  .opt-ic {
+    color: var(--accent);
+    margin-top: 1px;
+  }
+  .opt-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
   }
   .opt:disabled {
     opacity: 0.6;
@@ -202,9 +220,15 @@
     font-size: 12.5px;
   }
   .note {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     margin: 18px 0 0;
     font-size: 11.5px;
     color: var(--text-faint);
     line-height: 1.5;
+  }
+  .note :global(svg) {
+    flex-shrink: 0;
   }
 </style>

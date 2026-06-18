@@ -16,14 +16,14 @@
 <div class="usage">
   {#if usage.snapshot}
     {@const s = usage.snapshot}
-    <div class="row" title={`${fmt(s.five_h.tokens)} / ${fmt(s.five_h.cap)} tokens`}>
+    <div class="row" title={`${fmt(s.five_h.tokens)} / ${fmt(s.five_h.cap)} tokens · $${s.five_h_cost.toFixed(2)} sur 5h`}>
       <span class="lbl">5h</span>
       <div class="track">
         <div class="fill" style={`width:${s.five_h.pct}%;background:${tone(s.five_h.pct)}`}></div>
       </div>
       <span class="pct">{s.five_h.pct}%</span>
     </div>
-    <div class="row" title={`${fmt(s.week.tokens)} / ${fmt(s.week.cap)} tokens`}>
+    <div class="row" title={`${fmt(s.week.tokens)} / ${fmt(s.week.cap)} tokens · $${s.week_cost.toFixed(2)} sur 7j`}>
       <span class="lbl">7j</span>
       <div class="track">
         <div class="fill" style={`width:${s.week.pct}%;background:${tone(s.week.pct)}`}></div>

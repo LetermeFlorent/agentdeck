@@ -21,6 +21,8 @@ const DEFAULT_WEEK_CAP: u64 = 50_000_000;
 struct Entry {
     ts: u64, // epoch secondes
     tokens: u64,
+    #[serde(default)]
+    cost: f64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -55,6 +57,9 @@ pub struct Bar {
 pub struct UsageSnapshot {
     pub five_h: Bar,
     pub week: Bar,
+    /// Coût cumulé (USD) sur les fenêtres, d'après total_cost_usd renvoyé par Claude.
+    pub five_h_cost: f64,
+    pub week_cost: f64,
     /// "estimated" (comptage local) ou "real" (si un jour branché sur un vrai endpoint).
     pub source: String,
 }
@@ -103,10 +108,9 @@ fn bar(tokens: u64, cap: u64) -> Bar {
     Bar { tokens, cap, pct }
 }
 
-/// Enregistre les tokens d'un tour terminé et purge les entrées > 7j.
-pub fn record(store: &UsageStore, input: u64, output: u64) {
-    let total = input + output;
-    if total == 0 {
+/// Enregistre la conso d'un tour terminé (tous types de tokens + coût) et purge les entrées > 7j.
+pub fn record(store: &UsageStore, tokens: u64, cost: f64) {
+    if tokens == 0 && cost == 0.0 {
         return;
     }
     let mut data = match store.inner.lock() {
@@ -116,7 +120,8 @@ pub fn record(store: &UsageStore, input: u64, output: u64) {
     let t = now();
     data.entries.push(Entry {
         ts: t,
-        tokens: total,
+        tokens,
+        cost,
     });
     let cutoff = t.saturating_sub(WEEK_SECS);
     data.entries.retain(|e| e.ts >= cutoff);
@@ -131,6 +136,8 @@ pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
             return UsageSnapshot {
                 five_h: bar(0, DEFAULT_FIVE_H_CAP),
                 week: bar(0, DEFAULT_WEEK_CAP),
+                five_h_cost: 0.0,
+                week_cost: 0.0,
                 source: "estimated".into(),
             }
         }
@@ -138,21 +145,16 @@ pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
     let t = now();
     let five_h_cut = t.saturating_sub(FIVE_H_SECS);
     let week_cut = t.saturating_sub(WEEK_SECS);
-    let five_h_tokens: u64 = data
-        .entries
-        .iter()
-        .filter(|e| e.ts >= five_h_cut)
-        .map(|e| e.tokens)
-        .sum();
-    let week_tokens: u64 = data
-        .entries
-        .iter()
-        .filter(|e| e.ts >= week_cut)
-        .map(|e| e.tokens)
-        .sum();
+    let in_window = |cut: u64| data.entries.iter().filter(move |e| e.ts >= cut);
+    let five_h_tokens: u64 = in_window(five_h_cut).map(|e| e.tokens).sum();
+    let week_tokens: u64 = in_window(week_cut).map(|e| e.tokens).sum();
+    let five_h_cost: f64 = in_window(five_h_cut).map(|e| e.cost).sum();
+    let week_cost: f64 = in_window(week_cut).map(|e| e.cost).sum();
     UsageSnapshot {
         five_h: bar(five_h_tokens, data.five_h_cap),
         week: bar(week_tokens, data.week_cap),
+        five_h_cost,
+        week_cost,
         source: "estimated".into(),
     }
 }

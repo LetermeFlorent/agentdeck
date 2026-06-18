@@ -20,6 +20,8 @@ export interface Bar {
 export interface UsageSnapshot {
   five_h: Bar;
   week: Bar;
+  five_h_cost: number;
+  week_cost: number;
   source: string;
 }
 

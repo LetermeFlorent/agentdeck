@@ -197,17 +197,24 @@ fn handle_line(app: &tauri::AppHandle, id: &str, v: &Value) {
             emit(app, id, SessionEvent::ToolResult { ok: true });
         }
         Some("result") => {
+            // Claude renvoie l'usage complet à la fin de chaque requête : on le comptabilise.
             let usage_obj = v.get("usage");
-            let input = usage_obj
-                .and_then(|u| u.get("input_tokens"))
-                .and_then(Value::as_u64)
-                .unwrap_or(0);
-            let output = usage_obj
-                .and_then(|u| u.get("output_tokens"))
-                .and_then(Value::as_u64)
-                .unwrap_or(0);
-            // Comptabilise pour les barres d'usage (fenêtres 5h / 7j).
-            usage::record(app.state::<usage::UsageStore>().inner(), input, output);
+            let tok = |k: &str| {
+                usage_obj
+                    .and_then(|u| u.get(k))
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+            };
+            let input = tok("input_tokens");
+            let output = tok("output_tokens");
+            // Total réel = entrée + sortie + tokens de cache (création + lecture).
+            let total =
+                input + output + tok("cache_creation_input_tokens") + tok("cache_read_input_tokens");
+            let cost = v
+                .get("total_cost_usd")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0);
+            usage::record(app.state::<usage::UsageStore>().inner(), total, cost);
             emit(
                 app,
                 id,

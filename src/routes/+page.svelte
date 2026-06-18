@@ -10,6 +10,7 @@
   import SplitContainer from "$lib/components/SplitContainer.svelte";
   import UsageBars from "$lib/components/UsageBars.svelte";
   import ThemeToggle from "$lib/components/ThemeToggle.svelte";
+  import Icon from "$lib/components/Icon.svelte";
 
   let initialized = $state(false);
   let booted = $state(false);
@@ -74,9 +75,10 @@
       <div class="spacer"></div>
       <UsageBars />
       <div class="divider"></div>
-      <button class="btn" title="Nouveau pane Claude" onclick={() => layout.addRoot()}>+ Pane</button>
       <ThemeToggle />
-      <button class="icon-btn" title="Se déconnecter" onclick={logout}>⎋</button>
+      <button class="icon-btn" title="Se déconnecter" onclick={logout}>
+        <Icon name="logout" size={16} />
+      </button>
     </header>
 
     <main class="deck">
@@ -136,15 +138,15 @@
     gap: 9px;
   }
   .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 3px;
     background: var(--accent);
-    box-shadow: 0 0 0 3px var(--accent-weak);
   }
   .logo {
-    font-weight: 700;
-    font-size: 15px;
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 13.5px;
     letter-spacing: -0.01em;
   }
   .spacer {

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { theme, type ThemeChoice } from "$lib/stores/theme.svelte";
+  import Icon from "./Icon.svelte";
 
   const opts: { value: ThemeChoice; label: string; icon: string }[] = [
-    { value: "system", label: "Système", icon: "🖥" },
-    { value: "light", label: "Clair", icon: "☀" },
-    { value: "dark", label: "Sombre", icon: "☾" },
+    { value: "system", label: "Système", icon: "monitor" },
+    { value: "light", label: "Clair", icon: "sun" },
+    { value: "dark", label: "Sombre", icon: "moon" },
   ];
 </script>
 
@@ -17,7 +18,7 @@
       aria-pressed={theme.choice === o.value}
       onclick={() => theme.set(o.value)}
     >
-      <span aria-hidden="true">{o.icon}</span>
+      <Icon name={o.icon} size={15} />
     </button>
   {/each}
 </div>

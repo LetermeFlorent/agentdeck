@@ -1,56 +1,56 @@
-/* Design tokens — palette chaude façon Claude Code, thèmes sombre + clair.
-   Le thème actif est piloté par l'attribut data-theme sur <html> (light|dark),
-   résolu depuis le choix utilisateur (système/clair/sombre) côté JS. */
+/* Design tokens — style minimaliste façon Claude Code : surfaces plates, bordures fines,
+   quasi-monochrome chaud, accent corail discret, typographie monospace pour la structure.
+   Thème actif via data-theme sur <html> (light|dark). */
 
 :root {
   --font-ui: "Inter", "Segoe UI", system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", "Consolas", monospace;
 
-  --radius: 10px;
-  --radius-sm: 7px;
-  --pane-gap: 8px;
+  /* Minimaliste : rayons faibles, pas d'ombres marquées. */
+  --radius: 6px;
+  --radius-sm: 4px;
+  --pane-gap: 1px;
 
-  --shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
-
-  --transition: 140ms cubic-bezier(0.2, 0, 0, 1);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --transition: 120ms ease;
 }
 
 :root[data-theme="dark"] {
-  --bg: #1a1917;
-  --surface: #221f1d;
-  --surface-2: #2a2724;
-  --elevated: #322e2a;
-  --border: #3a3733;
-  --border-strong: #4a4641;
-  --text: #ece9e4;
-  --text-muted: #a39e96;
-  --text-faint: #756f67;
-  --accent: #d97757;
-  --accent-hover: #e08a6d;
-  --accent-weak: rgba(217, 119, 87, 0.15);
-  --good: #7fae6f;
-  --warn: #d6a14b;
-  --danger: #cf6b5d;
-  --track: #322e2a;
-  --user-bubble: #2f2b27;
+  --bg: #1b1a18;
+  --surface: #1b1a18;
+  --surface-2: #211f1d;
+  --elevated: #262422;
+  --border: #2f2c29;
+  --border-strong: #403c38;
+  --text: #e7e3dd;
+  --text-muted: #8d8880;
+  --text-faint: #5c574f;
+  --accent: #cc7a5c;
+  --accent-hover: #d98a6c;
+  --accent-weak: rgba(204, 122, 92, 0.13);
+  --good: #7c9f6e;
+  --warn: #c79a4e;
+  --danger: #cc6a5a;
+  --track: #2a2724;
+  --user-bubble: #242220;
 }
 
 :root[data-theme="light"] {
-  --bg: #f6f4ef;
-  --surface: #ffffff;
-  --surface-2: #f1eee8;
+  --bg: #faf9f6;
+  --surface: #faf9f6;
+  --surface-2: #f2f0ea;
   --elevated: #ffffff;
-  --border: #e4e0d7;
+  --border: #e7e3da;
   --border-strong: #d4cfc4;
-  --text: #2a2724;
-  --text-muted: #6b655c;
-  --text-faint: #9c958a;
-  --accent: #c4623f;
-  --accent-hover: #b15333;
-  --accent-weak: rgba(196, 98, 63, 0.12);
-  --good: #5f8f4f;
-  --warn: #b9842f;
-  --danger: #bf4d3e;
-  --track: #e9e5dc;
-  --user-bubble: #efece5;
+  --text: #232120;
+  --text-muted: #6e6860;
+  --text-faint: #a8a299;
+  --accent: #bd5d3b;
+  --accent-hover: #a94f30;
+  --accent-weak: rgba(189, 93, 59, 0.1);
+  --good: #5e8a4d;
+  --warn: #b07f2c;
+  --danger: #bb4a3b;
+  --track: #ece8df;
+  --user-bubble: #f0ede6;
 }
