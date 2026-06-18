@@ -354,7 +354,7 @@
         type="submit"
         disabled={!draft.trim()}
         use:tooltip={session?.streaming ? "Envoyer (pris en cours de route)" : "Envoyer (Entrée)"}
-      ><Icon name="send" size={14} /></button>
+      ><Icon name="send" size={13} /></button>
     </form>
   </div>
   {/if}
@@ -622,8 +622,8 @@
   .composer {
     display: flex;
     align-items: center;
-    gap: 5px;
-    padding: 5px 6px;
+    gap: 4px;
+    padding: 4px 5px;
     border-top: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
@@ -758,13 +758,13 @@
   textarea {
     flex: 1;
     resize: none;
-    max-height: 96px;
-    padding: 4px 6px;
+    max-height: 84px;
+    padding: 3px 6px;
     border: none;
     background: transparent;
     color: var(--text);
-    font-size: 11.5px;
-    line-height: 1.35;
+    font-size: 11px;
+    line-height: 1.3;
     outline: none;
     min-width: 0;
   }
@@ -790,8 +790,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 25px;
+    width: 23px;
+    height: 22px;
     flex-shrink: 0;
     border-radius: var(--radius-sm);
     background: var(--accent);

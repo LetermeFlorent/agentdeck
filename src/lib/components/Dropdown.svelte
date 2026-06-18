@@ -87,14 +87,14 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    height: 25px;
-    padding: 0 5px 0 8px;
+    height: 22px;
+    padding: 0 4px 0 7px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--bg);
     color: var(--text-muted);
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: 10px;
     transition: border-color var(--transition), color var(--transition), background var(--transition);
   }
   .dd-btn:hover {
