@@ -41,6 +41,14 @@ class TabsStore {
     return this.list.find((t) => t.id === this.activeId);
   }
 
+  /** Vrai si au moins un Claude est en train de répondre dans cet onglet. */
+  isTabBusy(id: string): boolean {
+    const t = this.list.find((t) => t.id === id);
+    if (!t) return false;
+    const root = id === this.activeId ? layout.root : t.root;
+    return collectSids(root).some((sid) => sessions.map[sid]?.streaming);
+  }
+
   /** Sauve la disposition courante (layout.root) dans l'onglet actif. */
   commitActive() {
     const t = this.active;

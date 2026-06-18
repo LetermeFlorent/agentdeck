@@ -186,6 +186,9 @@
         {#each tabs.list as t, i (t.id)}
           {#if i > 0}<span class="tab-sep"></span>{/if}
           <div class="tab" class:active={t.id === tabs.activeId}>
+            {#if tabs.isTabBusy(t.id)}
+              <span class="tab-live" use:tooltip={"Un Claude travaille dans cet onglet"}></span>
+            {/if}
             {#if renamingTab === t.id}
               <input
                 class="tab-edit"
@@ -451,6 +454,19 @@
   .tab.active {
     background: var(--surface-2);
     border-color: var(--border);
+  }
+  .tab-live {
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    margin-left: 7px;
+    border-radius: 50%;
+    background: var(--good);
+    animation: tabPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes tabPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
   }
   .tab-btn {
     max-width: 130px;
