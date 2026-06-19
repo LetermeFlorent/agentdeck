@@ -47,6 +47,45 @@
     el.select();
   }
 
+  // Réordonnancement des onglets par glisser (pointer-based : pas de DnD natif,
+  // donc aucun "contour de dépôt" parasite dans les chats/textarea).
+  let dragTab = $state(""); // onglet en cours de glisse
+  let dropTab = $state(""); // cible survolée
+  let dragging = $state(false); // seuil franchi
+  let dragStartX = 0;
+  let justDragged = false; // pour annuler le clic qui suit une glisse
+
+  function onTabPointerDown(e: PointerEvent, id: string) {
+    if (e.button !== 0 || renamingTab === id) return;
+    dragTab = id;
+    dragStartX = e.clientX;
+    dragging = false;
+    window.addEventListener("pointermove", onTabPointerMove);
+    window.addEventListener("pointerup", onTabPointerUp);
+  }
+  function onTabPointerMove(e: PointerEvent) {
+    if (!dragTab) return;
+    if (!dragging) {
+      if (Math.abs(e.clientX - dragStartX) < 5) return;
+      dragging = true;
+    }
+    const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const tab = el?.closest<HTMLElement>(".tab");
+    const id = tab?.dataset.tabId ?? "";
+    dropTab = id && id !== dragTab ? id : "";
+  }
+  function onTabPointerUp() {
+    if (dragging && dropTab && dropTab !== dragTab) {
+      tabs.move(dragTab, dropTab);
+      justDragged = true;
+    }
+    window.removeEventListener("pointermove", onTabPointerMove);
+    window.removeEventListener("pointerup", onTabPointerUp);
+    dragTab = "";
+    dropTab = "";
+    dragging = false;
+  }
+
   onMount(async () => {
     theme.init();
     settings.load();
@@ -169,23 +208,33 @@
     <!-- Titlebar custom : barre app + contrôles système fusionnés (déco OS désactivée). -->
     <header class="topbar" data-tauri-drag-region>
       <div class="brand" data-tauri-drag-region>
-        <div class="dot"></div>
-        <span class="logo">agentdeck</span>
+        <div class="dot" data-tauri-drag-region></div>
+        <span class="logo" data-tauri-drag-region>agentdeck</span>
         {#if plan.label}
-          <span class="plan plan-{plan.level}" use:tooltip={`Abonnement Claude : ${plan.label}`}>
+          <span class="plan plan-{plan.level}" data-tauri-drag-region use:tooltip={`Abonnement Claude : ${plan.label}`}>
             {plan.label}
           </span>
         {/if}
         {#if plan.account}
-          <span class="account" use:tooltip={`Compte connecté : ${plan.account}`}>{plan.account}</span>
+          <span class="account" data-tauri-drag-region use:tooltip={`Compte connecté : ${plan.account}`}>{plan.account}</span>
         {/if}
       </div>
 
-      <div class="divider"></div>
-      <div class="tabs">
+      <div class="divider" data-tauri-drag-region></div>
+      <div class="tabs" data-tauri-drag-region>
         {#each tabs.list as t, i (t.id)}
-          {#if i > 0}<span class="tab-sep"></span>{/if}
-          <div class="tab" class:active={t.id === tabs.activeId}>
+          {#if i > 0}<span class="tab-sep" data-tauri-drag-region></span>{/if}
+          <div
+            class="tab"
+            role="tab"
+            tabindex="-1"
+            aria-selected={t.id === tabs.activeId}
+            data-tab-id={t.id}
+            class:active={t.id === tabs.activeId}
+            class:dragging={dragging && dragTab === t.id}
+            class:dropzone={dropTab === t.id}
+            onpointerdown={(e) => onTabPointerDown(e, t.id)}
+          >
             {#if tabs.isTabBusy(t.id)}
               <span class="tab-live" use:tooltip={"Un Claude travaille dans cet onglet"}></span>
             {/if}
@@ -207,8 +256,11 @@
             {:else}
               <button
                 class="tab-btn"
-                use:tooltip={"Clic : ouvrir · double-clic : renommer"}
-                onclick={() => tabs.select(t.id)}
+                use:tooltip={"Clic : ouvrir · glisser : réordonner · double-clic : renommer"}
+                onclick={() => {
+                  if (justDragged) { justDragged = false; return; }
+                  tabs.select(t.id);
+                }}
                 ondblclick={() => startRename(t)}
               >{t.name}</button>
             {/if}
@@ -223,18 +275,18 @@
           <Icon name="plus" size={14} />
         </button>
       </div>
-      <div class="divider"></div>
+      <div class="divider" data-tauri-drag-region></div>
 
       <div class="spacer" data-tauri-drag-region></div>
       <UsageBars />
-      <div class="divider"></div>
+      <div class="divider" data-tauri-drag-region></div>
       <button class="icon-btn" use:tooltip={"Paramètres"} onclick={() => (showSettings = true)}>
         <Icon name="settings" size={17} />
       </button>
       <button class="icon-btn" use:tooltip={"Se déconnecter"} onclick={logout}>
         <Icon name="logout" size={16} />
       </button>
-      <div class="wsep"></div>
+      <div class="wsep" data-tauri-drag-region></div>
       <div class="wctl">
         <button class="wbtn" use:tooltip={"Réduire"} onclick={() => ipc.winMinimize()}>
           <Icon name="win-min" size={14} />
@@ -454,6 +506,14 @@
   .tab.active {
     background: var(--surface-2);
     border-color: var(--border);
+  }
+  .tab.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+  }
+  .tab.dropzone {
+    border-color: var(--accent);
+    box-shadow: inset 2px 0 0 var(--accent);
   }
   .tab-live {
     flex-shrink: 0;

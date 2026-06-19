@@ -123,6 +123,19 @@ class TabsStore {
     this.touch();
   }
 
+  /** Réordonne : déplace l'onglet `fromId` à la position de `toId`. */
+  move(fromId: string, toId: string) {
+    if (fromId === toId) return;
+    const from = this.list.findIndex((t) => t.id === fromId);
+    const to = this.list.findIndex((t) => t.id === toId);
+    if (from < 0 || to < 0) return;
+    const next = [...this.list];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    this.list = next;
+    this.touch();
+  }
+
   serialize(): Tab[] {
     this.commitActive();
     return this.list.map((t) => ({ id: t.id, name: t.name, root: t.root }));

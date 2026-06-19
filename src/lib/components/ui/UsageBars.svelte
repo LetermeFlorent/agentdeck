@@ -27,26 +27,26 @@
   }
 </script>
 
-<div class="usage">
+<div class="usage" data-tauri-drag-region>
   {#if usage.snapshot}
     {@const s = usage.snapshot}
     {@const real = s.source === "real"}
-    <div class="row" use:tooltip={tip("5h", s.five_h, s.five_h_cost, real)}>
-      <span class="lbl">5h</span>
-      <div class="track">
-        <div class="fill" style={`width:${s.five_h.pct}%;background:${tone(s.five_h.pct)}`}></div>
+    <div class="row" data-tauri-drag-region use:tooltip={tip("5h", s.five_h, s.five_h_cost, real)}>
+      <span class="lbl" data-tauri-drag-region>5h</span>
+      <div class="track" data-tauri-drag-region>
+        <div class="fill" data-tauri-drag-region style={`width:${s.five_h.pct}%;background:${tone(s.five_h.pct)}`}></div>
       </div>
-      <span class="pct">{s.five_h.pct}%</span>
+      <span class="pct" data-tauri-drag-region>{s.five_h.pct}%</span>
     </div>
-    <div class="row" use:tooltip={tip("7j", s.week, s.week_cost, real)}>
-      <span class="lbl">7j</span>
-      <div class="track">
-        <div class="fill" style={`width:${s.week.pct}%;background:${tone(s.week.pct)}`}></div>
+    <div class="row" data-tauri-drag-region use:tooltip={tip("7j", s.week, s.week_cost, real)}>
+      <span class="lbl" data-tauri-drag-region>7j</span>
+      <div class="track" data-tauri-drag-region>
+        <div class="fill" data-tauri-drag-region style={`width:${s.week.pct}%;background:${tone(s.week.pct)}`}></div>
       </div>
-      <span class="pct">{s.week.pct}%</span>
+      <span class="pct" data-tauri-drag-region>{s.week.pct}%</span>
     </div>
     {#if !real}
-      <span class="src" use:tooltip={"Pas de donnée réelle dispo — estimation locale des tokens consommés via l'app."}>estimé</span>
+      <span class="src" data-tauri-drag-region use:tooltip={"Pas de donnée réelle dispo — estimation locale des tokens consommés via l'app."}>estimé</span>
     {/if}
   {/if}
 </div>
