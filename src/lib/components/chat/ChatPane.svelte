@@ -83,6 +83,7 @@
     overflow: hidden;
     min-width: 0;
     min-height: 0;
+    position: relative; /* ancre le composer en overlay (absolute) */
     transition: border-color var(--transition), box-shadow var(--transition);
   }
   .pane.drag-over {

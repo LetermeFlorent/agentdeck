@@ -137,18 +137,17 @@
     return () => window.removeEventListener("pointerdown", onDown, true);
   });
 
-  // Auto-resize du champ : grandit jusqu'à 5 lignes (~78px) puis devient scrollable.
-  // Réactif sur `draft` → gère la saisie ET le reset après envoi (draft = "").
+  // Le champ grandit avec le contenu ; comme le composer est en overlay ancré en bas,
+  // il déborde vers le HAUT par-dessus les messages (sans redimensionner la zone).
   $effect(() => {
     void draft;
     if (!ta) return;
-    // Vide → 1 ligne fixe (sinon le placeholder qui s'enroule en chat étroit gonfle le champ).
     if (!draft) {
       ta.style.height = "";
       return;
     }
     ta.style.height = "auto";
-    ta.style.height = Math.min(ta.scrollHeight, 78) + "px";
+    ta.style.height = Math.min(ta.scrollHeight, 220) + "px";
   });
 
   function submit(e: Event) {
@@ -306,14 +305,36 @@
 <style>
   .composer {
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     flex-wrap: wrap;
     gap: 4px;
     padding: 4px 5px;
-    border-top: 1px solid var(--border);
+    /* Overlay ancré en bas. Fond TRANSPARENT : seule une bande grise fixe (::before)
+       reste en bas ; la box de saisie grandit vers le haut par-dessus les messages,
+       sans que la zone grise n'augmente. */
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10;
+    background: transparent;
+    pointer-events: none; /* la zone transparente laisse cliquer les messages dessous */
+  }
+  /* Bande grise fixe (hauteur des contrôles au repos) derrière les boutons/jauge. */
+  .composer::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 36px;
     background: var(--surface-2);
-    flex-shrink: 0;
-    position: relative;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 16px color-mix(in srgb, var(--bg) 70%, transparent);
+    z-index: -1;
+  }
+  .composer > :global(*) {
+    pointer-events: auto;
   }
   .thumbs {
     order: -1;
@@ -438,7 +459,7 @@
   .field {
     flex: 1 1 140px;
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     gap: 5px;
     /* min-width pour forcer le passage à la ligne (pleine largeur) en pane étroit,
        au lieu de se comprimer à ~0 à côté des boutons → saisie inutilisable. */
@@ -488,7 +509,7 @@
   textarea {
     flex: 1;
     resize: none;
-    max-height: 78px; /* ~5 lignes */
+    max-height: 220px;
     overflow-y: auto;
     overscroll-behavior: contain;
     padding: 3px 6px;
