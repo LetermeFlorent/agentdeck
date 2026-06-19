@@ -41,7 +41,11 @@ export type SessionEvent =
   | { kind: "assistant_start" }
   | { kind: "assistant_delta"; text: string }
   | { kind: "thinking"; text: string }
-  | { kind: "tool_use"; name: string; input: string }
+  | { kind: "tool_use"; name: string; input: string; id: string }
+  | { kind: "tool_done"; id: string }
+  | { kind: "task_started"; task_id: string; description: string; subagent_type: string; prompt: string }
+  | { kind: "task_progress"; task_id: string; action: string; last_tool: string; tokens: number; duration_ms: number }
+  | { kind: "task_ended"; task_id: string; status: string }
   | { kind: "tool_result"; ok: boolean }
   | { kind: "progress"; output_tokens: number }
   | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number; context_tokens: number; context_window: number; is_error: boolean }

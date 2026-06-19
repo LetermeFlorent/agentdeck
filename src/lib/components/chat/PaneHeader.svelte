@@ -1,8 +1,13 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
   import { settings } from "$lib/stores/settings.svelte";
+  import { activity } from "$lib/stores/activity.svelte";
   import Icon from "../ui/Icon.svelte";
+  import ActivityPanel from "./ActivityPanel.svelte";
   import { tooltip } from "$lib/actions/tooltip";
+
+  let showActivity = $state(false);
+  const actCount = $derived(activity.count(sid));
 
   let {
     sid,
@@ -106,6 +111,11 @@
         <Icon name="gauge" size={14} />
       </button>
     {/if}
+    {#if actCount > 0}
+      <button class="icon-btn act" use:tooltip={"Sous-agents & shells en cours"} onclick={() => (showActivity = !showActivity)}>
+        <Icon name="terminal" size={14} /><span class="act-n">{actCount}</span>
+      </button>
+    {/if}
     {#if session?.streaming}
       <button class="icon-btn" use:tooltip={"Arrêter"} onclick={() => sessions.stop(sid)}>
         <Icon name="stop" size={15} />
@@ -140,6 +150,9 @@
       <Icon name="close" />
     </button>
   </div>
+  {#if showActivity}
+    <ActivityPanel {sid} onclose={() => (showActivity = false)} />
+  {/if}
 </header>
 
 <style>
@@ -151,6 +164,19 @@
     border-bottom: 1px solid var(--border);
     background: var(--surface-2);
     flex-shrink: 0;
+    position: relative;
+  }
+  .icon-btn.act {
+    width: auto;
+    gap: 3px;
+    padding: 0 5px;
+    color: var(--accent);
+    background: var(--accent-weak);
+  }
+  .act-n {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
   }
   .actions {
     display: flex;

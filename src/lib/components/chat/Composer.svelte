@@ -136,6 +136,11 @@
   $effect(() => {
     void draft;
     if (!ta) return;
+    // Vide → 1 ligne fixe (sinon le placeholder qui s'enroule en chat étroit gonfle le champ).
+    if (!draft) {
+      ta.style.height = "";
+      return;
+    }
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 78) + "px";
   });
@@ -267,7 +272,7 @@
   <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
     <textarea
       bind:this={ta}
-      placeholder="Message à Claude…  (/ commandes · coller une image)"
+      placeholder="Message à Claude…"
       bind:value={draft}
       onkeydown={onKey}
       oninput={() => {

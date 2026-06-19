@@ -14,6 +14,7 @@ use crate::usage;
 pub(super) struct ToolAcc {
     name: String,
     buf: String,
+    id: String,
 }
 
 /// Résume l'entrée d'un outil en une ligne (commande, fichier, motif…) pour l'affichage terminal.
@@ -90,8 +91,13 @@ pub(super) fn handle_line(
                             .and_then(Value::as_str)
                             .unwrap_or("tool")
                             .to_string();
+                        let tid = cb
+                            .and_then(|c| c.get("id"))
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_string();
                         // On attend la fin du bloc pour émettre (entrée assemblée).
-                        blocks.insert(index, ToolAcc { name, buf: String::new() });
+                        blocks.insert(index, ToolAcc { name, buf: String::new(), id: tid });
                     }
                 }
                 Some("content_block_delta") => {
@@ -125,10 +131,63 @@ pub(super) fn handle_line(
                 Some("content_block_stop") => {
                     if let Some(acc) = blocks.remove(&index) {
                         let input = summarize_tool_input(&acc.buf);
-                        emit(app, id, SessionEvent::ToolUse { name: acc.name, input });
+                        emit(app, id, SessionEvent::ToolUse { name: acc.name, input, id: acc.id });
                     }
                 }
                 _ => {}
+            }
+        }
+        // Sous-agents (Task) : cycle de vie exposé par le CLI en events system.
+        Some("system") if v.get("subtype").and_then(Value::as_str) == Some("task_started") => {
+            let g = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+            emit(app, id, SessionEvent::TaskStarted {
+                task_id: g("task_id"),
+                description: g("description"),
+                subagent_type: g("subagent_type"),
+                prompt: g("prompt"),
+            });
+        }
+        Some("system") if v.get("subtype").and_then(Value::as_str) == Some("task_progress") => {
+            let usage = v.get("usage");
+            emit(app, id, SessionEvent::TaskProgress {
+                task_id: v.get("task_id").and_then(Value::as_str).unwrap_or("").to_string(),
+                action: v.get("description").and_then(Value::as_str).unwrap_or("").to_string(),
+                last_tool: v.get("last_tool_name").and_then(Value::as_str).unwrap_or("").to_string(),
+                tokens: usage.and_then(|u| u.get("total_tokens")).and_then(Value::as_u64).unwrap_or(0),
+                duration_ms: usage.and_then(|u| u.get("duration_ms")).and_then(Value::as_u64).unwrap_or(0),
+            });
+        }
+        Some("system")
+            if matches!(
+                v.get("subtype").and_then(Value::as_str),
+                Some("task_updated") | Some("task_notification")
+            ) =>
+        {
+            // statut dans patch.status (task_updated) ou status (task_notification).
+            let status = v
+                .get("patch")
+                .and_then(|p| p.get("status"))
+                .and_then(Value::as_str)
+                .or_else(|| v.get("status").and_then(Value::as_str))
+                .unwrap_or("")
+                .to_string();
+            if !status.is_empty() && status != "in_progress" && status != "running" {
+                emit(app, id, SessionEvent::TaskEnded {
+                    task_id: v.get("task_id").and_then(Value::as_str).unwrap_or("").to_string(),
+                    status,
+                });
+            }
+        }
+        // Résultat d'outil (tool_result dans un message user) → l'outil a fini.
+        Some("user") => {
+            if let Some(arr) = v.get("message").and_then(|m| m.get("content")).and_then(Value::as_array) {
+                for b in arr {
+                    if b.get("type").and_then(Value::as_str) == Some("tool_result") {
+                        if let Some(tid) = b.get("tool_use_id").and_then(Value::as_str) {
+                            emit(app, id, SessionEvent::ToolDone { id: tid.to_string() });
+                        }
+                    }
+                }
             }
         }
         Some("assistant") => {

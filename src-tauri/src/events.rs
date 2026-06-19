@@ -16,8 +16,16 @@ pub enum SessionEvent {
     AssistantDelta { text: String },
     /// Fragment de réflexion (thinking) de l'assistant (streaming, affiché en mode terminal).
     Thinking { text: String },
-    /// L'assistant utilise un outil : nom + résumé de l'entrée (commande, fichier…).
-    ToolUse { name: String, input: String },
+    /// L'assistant utilise un outil : nom + résumé de l'entrée (commande, fichier…) + id (suivi).
+    ToolUse { name: String, input: String, id: String },
+    /// Fin d'un outil (tool_result reçu) — pour savoir quels shells tournent encore.
+    ToolDone { id: String },
+    /// Un sous-agent (Task) démarre.
+    TaskStarted { task_id: String, description: String, subagent_type: String, prompt: String },
+    /// Progression d'un sous-agent : action courante, dernier outil, tokens, durée (ms).
+    TaskProgress { task_id: String, action: String, last_tool: String, tokens: u64, duration_ms: u64 },
+    /// Fin d'un sous-agent : statut (completed/failed…).
+    TaskEnded { task_id: String, status: String },
     /// Progression du tour : tokens de sortie cumulés (pour l'indicateur live).
     Progress { output_tokens: u64 },
     /// Fin du tour : tokens du tour + coût cumulé (USD) + taille du contexte courant.

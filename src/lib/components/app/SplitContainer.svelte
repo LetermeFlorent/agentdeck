@@ -29,11 +29,14 @@
     e.preventDefault();
     const split = node;
     const rect = el.getBoundingClientRect();
+    const MIN_PX = 200; // taille mini d'un pane (sinon illisible)
     const move = (ev: PointerEvent) => {
-      const r =
-        split.dir === "row"
-          ? (ev.clientX - rect.left) / rect.width
-          : (ev.clientY - rect.top) / rect.height;
+      const size = split.dir === "row" ? rect.width : rect.height;
+      const pos = split.dir === "row" ? ev.clientX - rect.left : ev.clientY - rect.top;
+      let r = pos / size;
+      // Borne par pixels : chaque côté garde au moins MIN_PX (si la place le permet).
+      const m = size > MIN_PX * 2 ? MIN_PX / size : 0.5;
+      r = Math.max(m, Math.min(1 - m, r));
       layout.setRatio(split.nodeId, r);
     };
     const up = () => {

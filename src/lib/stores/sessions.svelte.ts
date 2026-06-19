@@ -5,6 +5,7 @@ import type { SessionEvent } from "$lib/ipc";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
+import { activity } from "./activity.svelte";
 import { PERM_MODES, MODELS, effortsFor } from "$lib/components/chat/chat-config";
 
 export interface ToolCall {
@@ -635,6 +636,13 @@ class SessionsStore {
         break;
       case "tool_use":
         this.lastAssistant(s).toolCalls.push({ name: e.name, input: e.input });
+        activity.handle(id, e); // suivi shells (Bash/PowerShell) qui tournent
+        break;
+      case "tool_done":
+      case "task_started":
+      case "task_progress":
+      case "task_ended":
+        activity.handle(id, e); // suivi sous-agents + fin d'outils
         break;
       case "progress":
         s.turnTokens = e.output_tokens;
@@ -656,6 +664,7 @@ class SessionsStore {
         if (typeof document !== "undefined" && !document.hasFocus()) ipc.requestAttention();
         // Mode Hermes : tour soldé par une erreur → apprentissage auto.
         if (e.is_error) this.maybeLearn(s, "Le tour s'est terminé en erreur (is_error).");
+        activity.clear(id); // fin du tour → plus rien ne tourne
         this.touch();
         break;
       case "error": {
@@ -679,6 +688,7 @@ class SessionsStore {
       case "exited":
         s.streaming = false;
         s.turnStart = null;
+        activity.clear(id);
         break;
     }
   }
