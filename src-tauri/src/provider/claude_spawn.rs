@@ -126,13 +126,27 @@ pub(super) async fn spawn(
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
 
-    // Lecture stderr (best-effort).
-    if let Some(err) = stderr {
+    // Lecture stderr : on conserve les dernières lignes (au lieu de les jeter) pour pouvoir
+    // diagnostiquer un crash de `claude`. La tâche se termine quand le pipe se ferme (process mort).
+    let stderr_task = stderr.map(|err| {
         tauri::async_runtime::spawn(async move {
+            const MAX_LINES: usize = 30;
+            let mut tail: Vec<String> = Vec::new();
             let mut lines = BufReader::new(err).lines();
-            while let Ok(Some(_)) = lines.next_line().await {}
-        });
-    }
+            while let Ok(Some(line)) = lines.next_line().await {
+                let line = line.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                eprintln!("[claude stderr] {line}");
+                if tail.len() == MAX_LINES {
+                    tail.remove(0);
+                }
+                tail.push(line.to_string());
+            }
+            tail
+        })
+    });
 
     // Lecture stdout : NDJSON → events. Se termine quand le process meurt.
     let app2 = app.clone();
@@ -149,6 +163,21 @@ pub(super) async fn spawn(
                 }
                 if let Ok(v) = serde_json::from_str::<Value>(line) {
                     handle_line(&app2, &id2, &v, &mut blocks, &mut streamed);
+                }
+            }
+        }
+        // Le process est mort : on récupère ce qui a été écrit sur stderr. Si non vide, c'est un
+        // crash/erreur → on le remonte à l'UI (sinon le diagnostic serait silencieusement perdu).
+        if let Some(task) = stderr_task {
+            if let Ok(tail) = task.await {
+                if !tail.is_empty() {
+                    emit(
+                        &app2,
+                        &id2,
+                        SessionEvent::Error {
+                            message: tail.join("\n"),
+                        },
+                    );
                 }
             }
         }

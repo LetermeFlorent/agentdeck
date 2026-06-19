@@ -40,8 +40,15 @@ pub fn clear_token() -> Result<(), String> {
 }
 
 /// Heuristique de validation de format d'un token OAuth Claude Code.
+/// Préfixe `sk-ant-oat`, longueur dans une plage réaliste, et seulement des caractères
+/// attendus (base64url + tirets) — évite d'accepter une ligne de texte arbitraire qui
+/// commencerait par le préfixe.
 pub fn looks_like_oauth(token: &str) -> bool {
-    token.starts_with("sk-ant-oat") && token.len() > 30
+    token.starts_with("sk-ant-oat")
+        && (40..=500).contains(&token.len())
+        && token
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
 /// Extrait un token OAuth depuis le contenu d'un fichier texte

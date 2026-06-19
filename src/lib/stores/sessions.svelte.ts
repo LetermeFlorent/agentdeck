@@ -6,6 +6,7 @@ import type { UnlistenFn } from "@tauri-apps/api/event";
 import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
 import { activity } from "./activity.svelte";
+import { STORAGE_KEYS } from "./keys";
 import { PERM_MODES, MODELS, effortsFor } from "$lib/components/chat/chat-config";
 
 export interface ToolCall {
@@ -158,7 +159,7 @@ class SessionsStore {
     // Cache (instantané) pour l'affichage, puis fetch backend pour rafraîchir/compléter.
     if (this.slashCommands.length === 0) {
       try {
-        const cached = JSON.parse(localStorage.getItem("agentdeck.slash.v2") || "[]");
+        const cached = JSON.parse(localStorage.getItem(STORAGE_KEYS.slash) || "[]");
         if (Array.isArray(cached) && cached.length) this.slashCommands = cached;
       } catch {
         /* ignore */
@@ -170,7 +171,7 @@ class SessionsStore {
       const list = await ipc.slashCommandsFetch();
       if (list.length) {
         this.slashCommands = list;
-        localStorage.setItem("agentdeck.slash.v2", JSON.stringify(list));
+        localStorage.setItem(STORAGE_KEYS.slash, JSON.stringify(list));
       }
     } catch {
       this.slashFetched = false; // échec → autorise une nouvelle tentative
@@ -284,48 +285,52 @@ class SessionsStore {
 
   /** Restaure des sessions persistées au démarrage (réenregistre côté backend pour --resume). */
   async hydrate(list: PersistedSession[]) {
-    for (const p of list) {
-      const started = p.messages.some((m) => m.role === "user");
-      await ipc.sessionRestore({
-        id: p.id,
-        title: p.title,
-        started,
-        cwd: p.cwd ?? this.effCwd,
-        model: p.model ?? undefined,
-      });
-      this.map[p.id] = {
-        id: p.id,
-        title: p.title,
-        model: p.model ?? this.effModel,
-        effort: p.effort ?? this.effEffort,
-        messages: p.messages,
-        streaming: false,
-        error: null,
-        collapsed: p.collapsed ?? false,
-        priv: p.priv ?? false,
-        queue: [],
-        turnStart: null,
-        turnTokens: 0,
-        totalTokens: p.totalTokens ?? 0,
-        costUsd: p.costUsd ?? 0,
-        contextTokens: p.contextTokens ?? 0,
-        contextWindow: p.contextWindow ?? 0,
-        lastActivity: Date.now(),
-        zoom: p.zoom ?? 1,
-        permMode: p.permMode ?? "bypassPermissions",
-        disabledTools: p.disabledTools ?? [],
-        allowRules: p.allowRules ?? "",
-        denyRules: p.denyRules ?? "",
-        permFlash: "",
-        modelFlash: "",
-        effortFlash: "",
-        autoModelOff: p.autoModelOff ?? false,
-        autoEffortOff: p.autoEffortOff ?? false,
-        draft: "",
-        cwd: p.cwd ?? this.effCwd,
-      };
-      await this.attach(p.id);
-    }
+    // Sessions indépendantes → on les restaure en parallèle (au lieu d'enchaîner les
+    // allers-retours IPC séquentiellement, ce qui ralentit la réouverture du deck).
+    await Promise.all(list.map((p) => this.hydrateOne(p)));
+  }
+
+  private async hydrateOne(p: PersistedSession) {
+    const started = p.messages.some((m) => m.role === "user");
+    await ipc.sessionRestore({
+      id: p.id,
+      title: p.title,
+      started,
+      cwd: p.cwd ?? this.effCwd,
+      model: p.model ?? undefined,
+    });
+    this.map[p.id] = {
+      id: p.id,
+      title: p.title,
+      model: p.model ?? this.effModel,
+      effort: p.effort ?? this.effEffort,
+      messages: p.messages,
+      streaming: false,
+      error: null,
+      collapsed: p.collapsed ?? false,
+      priv: p.priv ?? false,
+      queue: [],
+      turnStart: null,
+      turnTokens: 0,
+      totalTokens: p.totalTokens ?? 0,
+      costUsd: p.costUsd ?? 0,
+      contextTokens: p.contextTokens ?? 0,
+      contextWindow: p.contextWindow ?? 0,
+      lastActivity: Date.now(),
+      zoom: p.zoom ?? 1,
+      permMode: p.permMode ?? "bypassPermissions",
+      disabledTools: p.disabledTools ?? [],
+      allowRules: p.allowRules ?? "",
+      denyRules: p.denyRules ?? "",
+      permFlash: "",
+      modelFlash: "",
+      effortFlash: "",
+      autoModelOff: p.autoModelOff ?? false,
+      autoEffortOff: p.autoEffortOff ?? false,
+      draft: "",
+      cwd: p.cwd ?? this.effCwd,
+    };
+    await this.attach(p.id);
   }
 
   serialize(): PersistedSession[] {
@@ -661,7 +666,7 @@ class SessionsStore {
           if (merged.length !== this.slashCommands.length) {
             this.slashCommands = merged;
             try {
-              localStorage.setItem("agentdeck.slash.v2", JSON.stringify(merged));
+              localStorage.setItem(STORAGE_KEYS.slash, JSON.stringify(merged));
             } catch {
               /* ignore */
             }

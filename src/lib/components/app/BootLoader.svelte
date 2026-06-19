@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Écran de démarrage : accueil « Bonjour {user} » + console de boot façon Claude Code.
+  // Écran de démarrage : vrai logo Claude (burst/étincelle) animé + lignes de boot, à plat.
   import { fly } from "svelte/transition";
 
   let { username = "" }: { username?: string } = $props();
@@ -13,6 +13,24 @@
   let frame = $state(0);
   let step = $state(0);
 
+  // Logo Claude : rayons radiaux de longueurs irrégulières (aspect "étincelle" organique).
+  const CX = 50;
+  const CY = 50;
+  const INNER = 7;
+  const RAY_LENS = [40, 31, 38, 30, 39, 32, 40, 30, 37, 33, 39, 31];
+  const rays = RAY_LENS.map((len, i) => {
+    const a = (i * 360) / RAY_LENS.length;
+    const rad = (a * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    return {
+      x1: CX + INNER * cos,
+      y1: CY + INNER * sin,
+      x2: CX + (INNER + len) * cos,
+      y2: CY + (INNER + len) * sin,
+    };
+  });
+
   $effect(() => {
     const iv = setInterval(() => (frame = (frame + 1) % FRAMES.length), 120);
     const sv = setInterval(() => (step = Math.min(STEPS.length - 1, step + 1)), 650);
@@ -24,16 +42,30 @@
 </script>
 
 <div class="boot-screen" data-tauri-drag-region>
-  <div class="term" in:fly={{ y: 10, duration: 240 }}>
-    <div class="bar">
-      <span class="d r"></span><span class="d y"></span><span class="d g"></span>
-      <span class="bar-title">agentdeck</span>
-    </div>
-    <div class="body">
-      <p class="hello">
-        <span class="prompt">$</span> bonjour {username || "à toi"}
-        <span class="caret"></span>
-      </p>
+  <div class="stage" in:fly={{ y: 10, duration: 240 }}>
+    <!-- Vrai logo Claude : étincelle radiale, couleur Claude orange. -->
+    <svg class="logo" viewBox="0 0 100 100" width="92" height="92" aria-hidden="true">
+      <g class="burst">
+        {#each rays as r}
+          <line
+            x1={r.x1}
+            y1={r.y1}
+            x2={r.x2}
+            y2={r.y2}
+            stroke="#d97757"
+            stroke-width="7"
+            stroke-linecap="round"
+          />
+        {/each}
+      </g>
+    </svg>
+
+    <p class="hello">
+      <span class="prompt">$</span> bonjour {username || "à toi"}
+      <span class="caret"></span>
+    </p>
+
+    <div class="steps">
       {#each STEPS as s, i}
         {#if i <= step}
           <p class="line" in:fly={{ x: -6, duration: 160 }}>
@@ -58,52 +90,40 @@
     background: var(--bg);
     padding: 24px;
   }
-  .term {
-    width: 100%;
-    max-width: 380px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-  }
-  .bar {
+  .stage {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 7px 10px;
-    background: var(--surface-2);
-    border-bottom: 1px solid var(--border);
-  }
-  .d {
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  .d.r {
-    background: #e06c6c;
-  }
-  .d.y {
-    background: #d8b24a;
-  }
-  .d.g {
-    background: var(--good);
-  }
-  .bar-title {
-    margin-left: 6px;
+    gap: 14px;
     font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-faint);
   }
-  .body {
-    padding: 16px 16px 18px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 1.9;
+  .logo {
+    animation: pulse 2.4s ease-in-out infinite;
+    filter: drop-shadow(0 8px 22px rgba(217, 119, 87, 0.35));
+  }
+  /* Rotation lente + battement doux de l'étincelle. */
+  .burst {
+    transform-origin: 50px 50px;
+    animation: spin 16s linear infinite;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(0.94);
+      opacity: 0.9;
+    }
+    50% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
   .hello {
-    margin: 0 0 6px;
+    margin: 0;
     color: var(--text);
     font-size: 14.5px;
     font-weight: 600;
@@ -126,6 +146,12 @@
       opacity: 0;
     }
   }
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+  }
   .line {
     margin: 0;
     display: flex;
@@ -133,6 +159,7 @@
     gap: 8px;
     color: var(--text-muted);
     font-size: 12.5px;
+    line-height: 1.9;
   }
   .spin {
     color: var(--accent);

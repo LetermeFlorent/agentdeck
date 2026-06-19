@@ -5,8 +5,10 @@
 import { sessions, type PersistedSession } from "./sessions.svelte";
 import { tabs, type Tab } from "./tabs.svelte";
 import { type Node } from "./layout.svelte";
+import { debounce } from "../util/debounce";
+import { STORAGE_KEYS } from "./keys";
 
-const KEY = "agentdeck.deck.v1";
+const KEY = STORAGE_KEYS.deck;
 
 interface DeckState {
   tabs: Tab[];
@@ -14,7 +16,7 @@ interface DeckState {
   sessions: PersistedSession[];
 }
 
-export function save() {
+function saveNow() {
   const state: DeckState = {
     tabs: tabs.serialize(),
     activeId: tabs.activeId,
@@ -26,6 +28,12 @@ export function save() {
     /* quota / indispo : on ignore */
   }
 }
+
+// Sauvegarde debouncée : appelée à chaque frappe/changement réactif, mais n'écrit dans
+// localStorage qu'après une courte inactivité (au lieu d'une sérialisation complète par frappe).
+export const save = debounce(saveNow, 400);
+/** Force l'écriture immédiate de l'état en attente (avant fermeture/déconnexion). */
+export const flush = save.flush;
 
 export function load(): DeckState | null {
   try {
@@ -51,6 +59,7 @@ export function load(): DeckState | null {
 }
 
 export function clear() {
+  save.cancel(); // évite qu'une sauvegarde en attente ne réécrive l'état juste après le clear
   try {
     localStorage.removeItem(KEY);
   } catch {

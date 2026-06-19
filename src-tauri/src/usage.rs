@@ -207,8 +207,7 @@ fn iso_to_epoch(s: &str) -> i64 {
 }
 
 /// Un appel à l'endpoint usage. Renvoie le vrai 5h/7j si succès.
-async fn fetch_real(token: &str) -> Option<RealUsage> {
-    let client = reqwest::Client::new();
+async fn fetch_real(client: &reqwest::Client, token: &str) -> Option<RealUsage> {
     let resp = client
         .get(OAUTH_USAGE_URL)
         .header("Authorization", format!("Bearer {token}"))
@@ -246,10 +245,21 @@ async fn fetch_real(token: &str) -> Option<RealUsage> {
 /// et met en cache le vrai usage. Démarre dès qu'un token est présent.
 pub async fn run_poller(app: tauri::AppHandle) {
     use tauri::Manager;
+    // Client HTTP réutilisé sur toute la durée de vie du poller (réutilise les connexions).
+    let client = reqwest::Client::new();
+    // Token mis en cache : l'accès keyring est potentiellement bloquant et la valeur ne change
+    // quasi jamais en cours d'exécution. On ne relit le keyring que si le cache est vide.
+    let mut cached_token: Option<String> = None;
     loop {
-        if let Some(token) = crate::auth::get_token() {
-            if let Some(r) = fetch_real(&token).await {
-                app.state::<UsageStore>().set_real(r);
+        if cached_token.is_none() {
+            cached_token = crate::auth::get_token();
+        }
+        if let Some(token) = cached_token.as_deref() {
+            match fetch_real(&client, token).await {
+                Some(r) => app.state::<UsageStore>().set_real(r),
+                // Échec (token révoqué/expiré, réseau…) : on invalide le cache pour relire
+                // le keyring au prochain tick, au cas où le token aurait été renouvelé.
+                None => cached_token = None,
             }
         }
         tokio::time::sleep(std::time::Duration::from_secs(POLL_INTERVAL_S)).await;
@@ -273,9 +283,20 @@ pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
     let t = now();
     let five_h_cut = t.saturating_sub(FIVE_H_SECS);
     let week_cut = t.saturating_sub(WEEK_SECS);
-    let in_window = |cut: u64| data.entries.iter().filter(move |e| e.ts >= cut);
-    let five_h_cost: f64 = in_window(five_h_cut).map(|e| e.cost).sum();
-    let week_cost: f64 = in_window(week_cut).map(|e| e.cost).sum();
+    // Une seule passe sur les entrées : coût + tokens sur les deux fenêtres (au lieu de 4 passes).
+    let (five_h_cost, week_cost, five_h_tokens, week_tokens) = data.entries.iter().fold(
+        (0.0_f64, 0.0_f64, 0_u64, 0_u64),
+        |(fhc, wc, fht, wt), e| {
+            let in_5h = e.ts >= five_h_cut;
+            let in_week = e.ts >= week_cut;
+            (
+                if in_5h { fhc + e.cost } else { fhc },
+                if in_week { wc + e.cost } else { wc },
+                if in_5h { fht + e.tokens } else { fht },
+                if in_week { wt + e.tokens } else { wt },
+            )
+        },
+    );
 
     // Priorité des sources de "réel" :
     //  1. endpoint OAuth interrogé par agentdeck (token-driven, portable) ;
@@ -300,8 +321,6 @@ pub fn snapshot(store: &UsageStore) -> UsageSnapshot {
             source: "real".into(),
         };
     }
-    let five_h_tokens: u64 = in_window(five_h_cut).map(|e| e.tokens).sum();
-    let week_tokens: u64 = in_window(week_cut).map(|e| e.tokens).sum();
     UsageSnapshot {
         five_h: bar(five_h_tokens, data.five_h_cap),
         week: bar(week_tokens, data.week_cap),

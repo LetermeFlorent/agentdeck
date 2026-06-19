@@ -3,8 +3,9 @@
 // pendant qu'il travaille (steering / envoi en cours de route), comme l'app interactive.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
+use parking_lot::Mutex;
 use serde::Serialize;
 use tokio::process::{Child, ChildStdin};
 use tokio::sync::Mutex as TokioMutex;
@@ -73,11 +74,11 @@ impl SessionManager {
             model,
             proc: Arc::new(TokioMutex::new(None)),
         };
-        self.sessions.lock().unwrap().insert(id, meta);
+        self.sessions.lock().insert(id, meta);
     }
 
     pub fn list(&self) -> Vec<SessionInfo> {
-        let map = self.sessions.lock().unwrap();
+        let map = self.sessions.lock();
         let mut v: Vec<SessionInfo> = map
             .values()
             .map(|m| SessionInfo {
@@ -93,7 +94,7 @@ impl SessionManager {
 
     /// Contexte d'envoi : (handle process partagé, cwd) si la session existe.
     pub fn send_ctx(&self, id: &str) -> Option<(SharedProc, Option<String>)> {
-        let map = self.sessions.lock().unwrap();
+        let map = self.sessions.lock();
         let m = map.get(id)?;
         Some((m.proc.clone(), m.cwd.clone()))
     }
@@ -101,19 +102,19 @@ impl SessionManager {
     /// Change le dossier de travail d'une session et renvoie son process (à tuer pour
     /// qu'il soit relancé dans le nouveau dossier au prochain envoi).
     pub fn set_cwd(&self, id: &str, cwd: Option<String>) -> Option<SharedProc> {
-        let mut map = self.sessions.lock().unwrap();
+        let mut map = self.sessions.lock();
         let m = map.get_mut(id)?;
         m.cwd = cwd;
         Some(m.proc.clone())
     }
 
     pub fn proc_handle(&self, id: &str) -> Option<SharedProc> {
-        let map = self.sessions.lock().unwrap();
+        let map = self.sessions.lock();
         map.get(id).map(|m| m.proc.clone())
     }
 
     pub fn remove(&self, id: &str) -> Option<SharedProc> {
-        let mut map = self.sessions.lock().unwrap();
+        let mut map = self.sessions.lock();
         map.remove(id).map(|m| m.proc)
     }
 }

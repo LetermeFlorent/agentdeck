@@ -7,6 +7,9 @@
 // pendant que Claude travaille (envoi « en cours de route » / steering, comme l'app interactive).
 // Le lancement vit dans `claude_spawn`, le parsing du stdout dans `claude_stream`.
 
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
 use base64::Engine;
 use serde::Deserialize;
 use serde_json::json;
@@ -71,12 +74,25 @@ fn pick_ext(file: &ImageInput) -> String {
 /// Écrit les fichiers joints en temporaires et renvoie leurs chemins absolus.
 /// Claude Code ignore les blocs base64 en stream-json → on passe par des fichiers
 /// que le modèle lit avec l'outil Read (vérifié).
+/// Dossier temporaire des fichiers joints, créé une seule fois (au lieu de `create_dir_all`
+/// à chaque envoi). `None` tant qu'aucune création n'a réussi.
+fn files_dir() -> Option<&'static Path> {
+    static DIR: OnceLock<Option<PathBuf>> = OnceLock::new();
+    DIR.get_or_init(|| {
+        let dir = std::env::temp_dir().join("agentdeck-files");
+        std::fs::create_dir_all(&dir).ok().map(|_| dir)
+    })
+    .as_deref()
+}
+
 fn write_images(images: &[ImageInput]) -> Vec<String> {
     if images.is_empty() {
         return Vec::new();
     }
-    let dir = std::env::temp_dir().join("agentdeck-files");
-    let _ = std::fs::create_dir_all(&dir);
+    let dir = match files_dir() {
+        Some(d) => d,
+        None => return Vec::new(),
+    };
     let mut paths = Vec::new();
     for file in images {
         let bytes = match base64::engine::general_purpose::STANDARD.decode(file.data.trim()) {
@@ -103,9 +119,10 @@ fn session_exists(id: &str) -> bool {
     dir.push("projects");
     let file = format!("{id}.jsonl");
     match std::fs::read_dir(&dir) {
-        Ok(rd) => rd
-            .flatten()
-            .any(|e| e.path().is_dir() && e.path().join(&file).exists()),
+        Ok(rd) => rd.flatten().any(|e| {
+            let p = e.path();
+            p.is_dir() && p.join(&file).exists()
+        }),
         Err(_) => false,
     }
 }

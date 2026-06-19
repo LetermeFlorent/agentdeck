@@ -16,12 +16,16 @@ class UsageStore {
   }
 
   start() {
+    if (this.timer !== null) return; // déjà démarré : pas de second intervalle
     this.refresh();
     this.timer = window.setInterval(() => this.refresh(), 30_000);
   }
 
   stop() {
-    if (this.timer !== null) window.clearInterval(this.timer);
+    if (this.timer !== null) {
+      window.clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 }
 

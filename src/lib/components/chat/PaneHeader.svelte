@@ -7,17 +7,6 @@
   import ActivityPanel from "./ActivityPanel.svelte";
   import { tooltip } from "$lib/actions/tooltip";
 
-  let showActivity = $state(false);
-  const actCount = $derived(activity.count(sid));
-  async function pickCwd() {
-    const p = await ipc.pickFolder(session?.cwd || sessions.homePath);
-    if (p) sessions.setCwd(sid, p);
-  }
-  const cwdPath = $derived(session?.cwd || sessions.homePath);
-  const cwdBase = $derived(
-    cwdPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "dossier",
-  );
-
   let {
     sid,
     nodeId,
@@ -49,6 +38,17 @@
   );
 
   const session = $derived(sessions.map[sid]);
+
+  let showActivity = $state(false);
+  const actCount = $derived(activity.count(sid));
+  async function pickCwd() {
+    const p = await ipc.pickFolder(session?.cwd || sessions.homePath);
+    if (p) sessions.setCwd(sid, p);
+  }
+  const cwdPath = $derived(session?.cwd || sessions.homePath);
+  const cwdBase = $derived(
+    cwdPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "dossier",
+  );
 
   let editing = $state(false);
   let titleDraft = $state("");

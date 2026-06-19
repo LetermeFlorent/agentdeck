@@ -1,6 +1,9 @@
 // Réglages persistés : réouverture des onglets, modèle/effort par défaut (override utilisateur).
 
-const KEY = "agentdeck.settings.v1";
+import { debounce } from "../util/debounce";
+import { STORAGE_KEYS } from "./keys";
+
+const KEY = STORAGE_KEYS.settings;
 
 interface Persisted {
   restoreOnLaunch: boolean;
@@ -73,7 +76,11 @@ class SettingsStore {
     }
   }
 
-  private save() {
+  // Écriture debouncée : un setter peut être appelé en rafale (sliders, toggles) ; on ne
+  // sérialise/écrit qu'après une courte inactivité au lieu d'une fois par changement.
+  private save = debounce(() => this.saveNow(), 400);
+
+  private saveNow() {
     const p: Persisted = {
       restoreOnLaunch: this.restoreOnLaunch,
       defaultModel: this.defaultModel,
