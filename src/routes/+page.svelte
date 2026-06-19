@@ -118,6 +118,27 @@
           e.preventDefault();
           ipc.winToggleFullscreen();
         }
+        // Raccourcis onglets (ne nécessitent pas de chat focus).
+        if (e.ctrlKey && !e.altKey) {
+          if (e.key.toLowerCase() === "t") {
+            e.preventDefault();
+            tabs.create();
+            return;
+          }
+          if (e.key.toLowerCase() === "w") {
+            e.preventDefault();
+            if (tabs.activeId) tabs.close(tabs.activeId);
+            return;
+          }
+          if (/^[1-9]$/.test(e.key)) {
+            const t = tabs.list[Number(e.key) - 1];
+            if (t) {
+              e.preventDefault();
+              tabs.select(t.id);
+            }
+            return;
+          }
+        }
         // Raccourcis de cycle sur le chat focus (bulle près du contrôle concerné).
         // Fallback : si aucun chat focus, on cible le 1er chat du layout courant.
         let sid = sessions.focusedSid;

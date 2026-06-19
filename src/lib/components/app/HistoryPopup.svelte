@@ -9,8 +9,12 @@
   let { onclose, now }: { onclose: () => void; now: number } = $props();
 
   let items = $state<ipc.SessionHist[]>([]);
+  let results = $state<ipc.SessionHist[]>([]);
+  let query = $state("");
   let loading = $state(true);
+  let searching = $state(false);
   let busy = $state("");
+  const shown = $derived(query.trim() ? results : items);
 
   onMount(async () => {
     try {
@@ -20,6 +24,28 @@
     } finally {
       loading = false;
     }
+  });
+
+  // Recherche globale debouncée (250 ms).
+  let timer: number | undefined;
+  $effect(() => {
+    const q = query.trim();
+    clearTimeout(timer);
+    if (!q) {
+      results = [];
+      searching = false;
+      return;
+    }
+    searching = true;
+    timer = window.setTimeout(async () => {
+      try {
+        results = await ipc.searchSessions(q, settings.historyLimit);
+      } catch {
+        results = [];
+      } finally {
+        searching = false;
+      }
+    }, 250);
   });
 
   /** Date relative compacte (fr). `now` est passé par le parent (epoch ms). */
@@ -62,17 +88,25 @@
     onclick={(e) => e.stopPropagation()}
   >
     <div class="head">
-      <span>Historique · {items.length}</span>
+      <input
+        class="search"
+        placeholder="Rechercher dans toutes les conversations…"
+        bind:value={query}
+        autofocus
+      />
     </div>
     <div class="list">
       {#if loading}
         <div class="empty">Chargement…</div>
-      {:else if items.length === 0}
-        <div class="empty">Aucune conversation.</div>
+      {:else if searching}
+        <div class="empty">Recherche…</div>
+      {:else if shown.length === 0}
+        <div class="empty">{query.trim() ? "Aucun résultat." : "Aucune conversation."}</div>
       {:else}
-        {#each items as h (h.id)}
+        {#each shown as h (h.id)}
           <button class="item" disabled={busy === h.id} onclick={() => open(h)}>
             <span class="t">{h.title}</span>
+            {#if h.snippet}<span class="snip">{h.snippet}</span>{/if}
             <span class="meta">
               {ago(h.ts)}{#if proj(h.cwd)} · {proj(h.cwd)}{/if}
             </span>
@@ -104,13 +138,29 @@
     overflow: hidden;
   }
   .head {
-    padding: 9px 12px;
+    padding: 8px;
     border-bottom: 1px solid var(--border);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+  }
+  .search {
+    width: 100%;
+    height: 28px;
+    padding: 0 9px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+  }
+  .search:focus {
+    border-color: var(--accent);
+  }
+  .snip {
+    font-size: 10.5px;
+    color: var(--text-faint);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .list {
     overflow-y: auto;

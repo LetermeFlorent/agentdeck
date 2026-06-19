@@ -122,9 +122,12 @@ export interface SessionHist {
   title: string;
   cwd: string;
   ts: number;
+  snippet?: string;
 }
 export const recentSessions = (limit: number) =>
   invoke<SessionHist[]>("recent_sessions", { limit });
+export const searchSessions = (query: string, limit: number) =>
+  invoke<SessionHist[]>("search_sessions", { query, limit });
 export const loadMessages = (id: string) =>
   invoke<{ role: "user" | "assistant"; text: string }[]>("load_messages", { id });
 

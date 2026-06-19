@@ -11,6 +11,9 @@ pub struct SessionHist {
     pub cwd: String,
     /// Date de dernière modif (epoch secondes) — pour le tri et l'affichage.
     pub ts: u64,
+    /// Extrait autour du terme recherché (vide pour la liste récente).
+    #[serde(default)]
+    pub snippet: String,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -83,47 +86,98 @@ fn read_meta(path: &std::path::Path) -> (String, String) {
     (title, cwd)
 }
 
-/// Liste les `limit` sessions les plus récentes (toutes confondues), titre + date.
-#[tauri::command]
-pub fn recent_sessions(limit: usize) -> Vec<SessionHist> {
+/// Tous les .jsonl de sessions, triés par date de modif décroissante (récent d'abord).
+fn all_jsonl_desc() -> Vec<(PathBuf, u64)> {
     let dir = match projects_dir() {
         Some(d) => d,
         None => return vec![],
     };
-    // Récupère tous les .jsonl avec leur mtime.
     let mut files: Vec<(PathBuf, u64)> = vec![];
-    let walk = |d: &PathBuf, files: &mut Vec<(PathBuf, u64)>| {
-        if let Ok(rd) = std::fs::read_dir(d) {
-            for proj in rd.flatten().filter(|e| e.path().is_dir()) {
-                if let Ok(inner) = std::fs::read_dir(proj.path()) {
-                    for f in inner.flatten() {
-                        let p = f.path();
-                        if p.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                            let ts = f
-                                .metadata()
-                                .ok()
-                                .and_then(|m| m.modified().ok())
-                                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                                .map(|d| d.as_secs())
-                                .unwrap_or(0);
-                            files.push((p, ts));
-                        }
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for proj in rd.flatten().filter(|e| e.path().is_dir()) {
+            if let Ok(inner) = std::fs::read_dir(proj.path()) {
+                for f in inner.flatten() {
+                    let p = f.path();
+                    if p.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                        let ts = f
+                            .metadata()
+                            .ok()
+                            .and_then(|m| m.modified().ok())
+                            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                            .map(|d| d.as_secs())
+                            .unwrap_or(0);
+                        files.push((p, ts));
                     }
                 }
             }
         }
-    };
-    walk(&dir, &mut files);
+    }
     files.sort_by(|a, b| b.1.cmp(&a.1));
+    files
+}
+
+/// Liste les `limit` sessions les plus récentes (toutes confondues), titre + date.
+#[tauri::command]
+pub fn recent_sessions(limit: usize) -> Vec<SessionHist> {
+    let mut files = all_jsonl_desc();
     files.truncate(limit.clamp(1, 200));
     files
         .into_iter()
         .map(|(p, ts)| {
             let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
             let (title, cwd) = read_meta(&p);
-            SessionHist { id, title, cwd, ts }
+            SessionHist { id, title, cwd, ts, snippet: String::new() }
         })
         .collect()
+}
+
+/// Cherche `query` (insensible à la casse) dans le texte des messages de toutes les sessions.
+/// Renvoie jusqu'à `limit` résultats (récent d'abord) avec un extrait. Scanne au plus 800 fichiers.
+#[tauri::command]
+pub fn search_sessions(query: String, limit: usize) -> Vec<SessionHist> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return vec![];
+    }
+    let cap = limit.clamp(1, 100);
+    let mut out: Vec<SessionHist> = vec![];
+    for (p, ts) in all_jsonl_desc().into_iter().take(800) {
+        let content = match std::fs::read_to_string(&p) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+        // Cherche le 1ᵉʳ message contenant la requête (early-exit).
+        let mut snippet = String::new();
+        for line in content.lines() {
+            let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
+            let role = v.get("type").and_then(Value::as_str);
+            if role != Some("user") && role != Some("assistant") {
+                continue;
+            }
+            let Some(msg) = v.get("message") else { continue };
+            let text = extract_text(msg.get("content").unwrap_or(&Value::Null));
+            let t = text.trim();
+            if t.is_empty() || is_noise(t) {
+                continue;
+            }
+            if let Some(pos) = t.to_lowercase().find(&q) {
+                // Extrait ~120 car. autour du match.
+                let start = t[..pos].char_indices().rev().take(40).last().map(|(i, _)| i).unwrap_or(0);
+                let end = t[pos..].char_indices().take(110).last().map(|(i, c)| pos + i + c.len_utf8()).unwrap_or(t.len());
+                snippet = t[start..end].replace('\n', " ").trim().to_string();
+                break;
+            }
+        }
+        if !snippet.is_empty() {
+            let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+            let (title, cwd) = read_meta(&p);
+            out.push(SessionHist { id, title, cwd, ts, snippet });
+            if out.len() >= cap {
+                break;
+            }
+        }
+    }
+    out
 }
 
 /// Trouve le chemin du .jsonl d'une session par son id (recherche dans tous les projets).

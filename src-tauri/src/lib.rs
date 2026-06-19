@@ -65,6 +65,7 @@ pub fn run() {
             commands::auto::effort_levels,
             commands::auto::auto_pick,
             commands::history::recent_sessions,
+            commands::history::search_sessions,
             commands::history::load_messages,
         ])
         .run(tauri::generate_context!())
