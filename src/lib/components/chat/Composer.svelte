@@ -13,8 +13,14 @@
   let { sid }: { sid: string } = $props();
   const session = $derived(sessions.map[sid]);
 
-  let draft = $state("");
+  // Brouillon restauré depuis la session (survit au repli/dépli du pane).
+  let draft = $state(sessions.map[sid]?.draft ?? "");
   let ta = $state<HTMLTextAreaElement>();
+  // Sauve le brouillon dans la session à chaque frappe.
+  $effect(() => {
+    const s = sessions.map[sid];
+    if (s) s.draft = draft;
+  });
 
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
   const efforts = $derived(effortsFor(session?.model));
@@ -430,11 +436,13 @@
     pointer-events: none;
   }
   .field {
-    flex: 1;
+    flex: 1 1 140px;
     display: flex;
     align-items: center;
     gap: 5px;
-    min-width: 0;
+    /* min-width pour forcer le passage à la ligne (pleine largeur) en pane étroit,
+       au lieu de se comprimer à ~0 à côté des boutons → saisie inutilisable. */
+    min-width: 140px;
     padding: 2px 2px 2px 3px;
     background: var(--bg);
     border: 1px solid var(--border);

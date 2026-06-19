@@ -68,6 +68,8 @@ export interface SessionState {
   /** Désactive l'auto-modèle / auto-effort uniquement pour ce chat (override du global). */
   autoModelOff: boolean;
   autoEffortOff: boolean;
+  /** Brouillon en cours (non envoyé) — survit au repli/dépli du pane. */
+  draft: string;
 }
 
 export interface PersistedSession {
@@ -195,6 +197,7 @@ class SessionsStore {
       effortFlash: "",
       autoModelOff: false,
       autoEffortOff: false,
+      draft: "",
     };
     this.focusedSid = id;
     await this.attach(id);
@@ -246,6 +249,7 @@ class SessionsStore {
       effortFlash: "",
       autoModelOff: false,
       autoEffortOff: false,
+      draft: "",
     };
     this.focusedSid = id;
     await this.attach(id);
@@ -291,6 +295,7 @@ class SessionsStore {
         effortFlash: "",
         autoModelOff: p.autoModelOff ?? false,
         autoEffortOff: p.autoEffortOff ?? false,
+        draft: "",
       };
       await this.attach(p.id);
     }

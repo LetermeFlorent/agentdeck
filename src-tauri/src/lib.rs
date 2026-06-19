@@ -1,4 +1,4 @@
-// agentdeck — backend Tauri. (relaunch : listes auto + redesign settings)
+// agentdeck — backend Tauri. (relaunch : brouillon persistant par chat)
 // Pilote plusieurs sessions Claude Code (multi-IA à terme). Les commandes exposées au
 // frontend vivent dans le module `commands` (regroupées par domaine).
 
