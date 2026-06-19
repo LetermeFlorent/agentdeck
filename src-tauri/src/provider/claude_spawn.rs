@@ -106,13 +106,14 @@ pub(super) async fn spawn(
         if let Some(out) = stdout {
             let mut lines = BufReader::new(out).lines();
             let mut blocks: HashMap<u64, ToolAcc> = HashMap::new();
+            let mut streamed = false; // un texte a-t-il été streamé pour le tour courant ?
             while let Ok(Some(line)) = lines.next_line().await {
                 let line = line.trim();
                 if line.is_empty() {
                     continue;
                 }
                 if let Ok(v) = serde_json::from_str::<Value>(line) {
-                    handle_line(&app2, &id2, &v, &mut blocks);
+                    handle_line(&app2, &id2, &v, &mut blocks, &mut streamed);
                 }
             }
         }

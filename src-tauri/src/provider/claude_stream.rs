@@ -45,6 +45,7 @@ pub(super) fn handle_line(
     id: &str,
     v: &Value,
     blocks: &mut HashMap<u64, ToolAcc>,
+    streamed: &mut bool,
 ) {
     match v.get("type").and_then(Value::as_str) {
         Some("system") if v.get("subtype").and_then(Value::as_str) == Some("init") => {
@@ -64,6 +65,7 @@ pub(super) fn handle_line(
             match ev.get("type").and_then(Value::as_str) {
                 Some("message_start") => {
                     blocks.clear(); // les index de blocs sont réinitialisés à chaque message
+                    *streamed = false; // nouveau tour : aucun texte streamé pour l'instant
                     emit(app, id, SessionEvent::AssistantStart);
                 }
                 Some("message_delta") => {
@@ -93,6 +95,7 @@ pub(super) fn handle_line(
                         Some("text_delta") => {
                             if let Some(t) = delta.and_then(|d| d.get("text")).and_then(Value::as_str)
                             {
+                                *streamed = true;
                                 emit(app, id, SessionEvent::AssistantDelta { text: t.to_string() });
                             }
                         }
@@ -121,6 +124,31 @@ pub(super) fn handle_line(
                     }
                 }
                 _ => {}
+            }
+        }
+        Some("assistant") => {
+            // Message assistant complet (non streamé via stream_event). Cas typique :
+            // sortie d'une commande slash built-in (/usage, /context, /cost…) qui ne
+            // produit pas de deltas. Si du texte a déjà été streamé pour ce tour, on
+            // ne ré-émet pas (le message complet est alors un doublon du flux).
+            if !*streamed {
+                let text: String = v
+                    .get("message")
+                    .and_then(|m| m.get("content"))
+                    .and_then(Value::as_array)
+                    .map(|arr| {
+                        arr.iter()
+                            .filter(|b| b.get("type").and_then(Value::as_str) == Some("text"))
+                            .filter_map(|b| b.get("text").and_then(Value::as_str))
+                            .collect::<Vec<_>>()
+                            .join("")
+                    })
+                    .unwrap_or_default();
+                if !text.is_empty() {
+                    *streamed = true;
+                    emit(app, id, SessionEvent::AssistantStart);
+                    emit(app, id, SessionEvent::AssistantDelta { text });
+                }
             }
         }
         Some("result") => {
