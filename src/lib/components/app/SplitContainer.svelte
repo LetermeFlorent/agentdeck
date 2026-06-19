@@ -4,8 +4,6 @@
   import { sessions } from "$lib/stores/sessions.svelte";
   import ChatPane from "../chat/ChatPane.svelte";
   import Self from "./SplitContainer.svelte";
-  import { scale } from "svelte/transition";
-  import { cubicOut } from "svelte/easing";
 
   let {
     node,
@@ -53,12 +51,13 @@
 </script>
 
 {#if node.kind === "leaf"}
-  <div class="leaf" in:scale={{ duration: 200, start: 0.97, opacity: 0, easing: cubicOut }}>
+  <div class="leaf">
     <ChatPane
       sid={node.sid}
       nodeId={node.nodeId}
-      canMinimize={parentDir === "row"}
+      canMinimize={parentDir !== undefined}
       collapseSide={side}
+      collapseDir={parentDir}
       {siblingCollapsed}
       canMove={parentDir !== undefined}
       onsplit={(dir) => layout.split(node.nodeId, dir)}

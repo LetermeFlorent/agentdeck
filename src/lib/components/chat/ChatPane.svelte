@@ -11,6 +11,7 @@
     nodeId,
     canMinimize = false,
     collapseSide,
+    collapseDir,
     siblingCollapsed = false,
     canMove = false,
     onsplit,
@@ -21,6 +22,7 @@
     nodeId: string;
     canMinimize?: boolean;
     collapseSide?: "a" | "b";
+    collapseDir?: "row" | "column";
     siblingCollapsed?: boolean;
     canMove?: boolean;
     onsplit: (dir: "row" | "column") => void;
@@ -57,6 +59,7 @@
   {#if collapsed}
     <div
       class="strip"
+      class:horizontal={collapseDir === "column"}
       role="button"
       tabindex="0"
       use:tooltip={`${session?.title ?? "Claude"} — déplier`}
@@ -69,7 +72,7 @@
       <span class="strip-state" class:work={session?.streaming}></span>
     </div>
   {:else}
-    <PaneHeader {sid} {nodeId} {canMinimize} {collapseSide} {siblingCollapsed} {canMove} {onsplit} {onclose} />
+    <PaneHeader {sid} {nodeId} {canMinimize} {collapseSide} {collapseDir} {siblingCollapsed} {canMove} {onsplit} {onclose} />
     <MessageLog {sid} />
     <Composer {sid} />
   {/if}
@@ -117,6 +120,21 @@
   }
   .strip:hover .chev.open {
     color: var(--accent);
+  }
+  /* Bande horizontale (chat minimisé en haut/bas d'un split vertical). */
+  .strip.horizontal {
+    flex-direction: row;
+    padding: 0 6px;
+  }
+  .strip.horizontal .strip-title {
+    writing-mode: horizontal-tb;
+    transform: none;
+    max-height: none;
+    max-width: 60%;
+  }
+  .strip.horizontal .strip-state {
+    margin-top: 0;
+    margin-left: auto;
   }
   .strip-title {
     writing-mode: vertical-rl;

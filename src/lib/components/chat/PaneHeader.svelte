@@ -23,6 +23,7 @@
     nodeId,
     canMinimize = false,
     collapseSide,
+    collapseDir,
     siblingCollapsed = false,
     canMove = false,
     onsplit,
@@ -32,11 +33,20 @@
     nodeId: string;
     canMinimize?: boolean;
     collapseSide?: "a" | "b";
+    collapseDir?: "row" | "column";
     siblingCollapsed?: boolean;
     canMove?: boolean;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
   } = $props();
+
+  // Rotation de la flèche minimiser : pointe vers le côté où le pane se replie.
+  // chevron de base pointe en bas. row: a=gauche(90) b=droite(-90) ; column: a=haut(180) b=bas(0).
+  const chevRot = $derived(
+    collapseDir === "column"
+      ? collapseSide === "a" ? 180 : 0
+      : collapseSide === "b" ? -90 : 90,
+  );
 
   const session = $derived(sessions.map[sid]);
 
@@ -154,8 +164,8 @@
       <Icon name={session?.priv ? "eye-off" : "eye"} size={15} />
     </button>
     {#if canMinimize && !siblingCollapsed}
-      <button class="icon-btn" use:tooltip={"Minimiser sur le côté"} onclick={() => sessions.setCollapsed(sid, true)}>
-        <span class="chev close" class:right={collapseSide === "b"}><Icon name="chevron" size={15} /></span>
+      <button class="icon-btn" use:tooltip={"Minimiser"} onclick={() => sessions.setCollapsed(sid, true)}>
+        <span class="chev" style={`transform: rotate(${chevRot}deg)`}><Icon name="chevron" size={15} /></span>
       </button>
     {/if}
     <button class="icon-btn" use:tooltip={"Diviser horizontalement (haut / bas)"} onclick={() => onsplit("column")}>
@@ -259,13 +269,6 @@
   .chev {
     display: flex;
     transition: transform var(--transition);
-  }
-  /* Flèche minimiser : pointe vers le côté où le chat se replie (gauche=A, droite=B). */
-  .chev.close {
-    transform: rotate(90deg);
-  }
-  .chev.close.right {
-    transform: rotate(-90deg);
   }
   .title {
     display: flex;
