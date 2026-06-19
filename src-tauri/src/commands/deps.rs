@@ -13,20 +13,34 @@ pub async fn check_claude() -> bool {
         .unwrap_or(false)
 }
 
-/// Installe Claude Code via l'installeur natif officiel (Windows PowerShell).
-#[tauri::command]
-pub async fn install_claude() -> Result<(), String> {
-    let out = tokio::process::Command::new("powershell")
+/// Commande PowerShell de l'installeur officiel.
+/// On répare `PSModulePath` (valeur machine) avant `irm | iex` : dans le sous-processus
+/// lancé par Tauri, l'auto-chargement de cmdlets comme `Get-FileHash` (module Utility)
+/// échoue si ce chemin est incomplet.
+const INSTALL_CMD: &str = "$env:PSModulePath = [Environment]::GetEnvironmentVariable('PSModulePath','Machine') + ';' + $env:PSModulePath; irm https://claude.ai/install.ps1 | iex";
+
+async fn run_installer(shell: &str) -> std::io::Result<std::process::Output> {
+    tokio::process::Command::new(shell)
         .args([
             "-NoProfile",
             "-ExecutionPolicy",
             "Bypass",
             "-Command",
-            "irm https://claude.ai/install.ps1 | iex",
+            INSTALL_CMD,
         ])
         .output()
         .await
-        .map_err(|e| format!("Lancement installeur : {e}"))?;
+}
+
+/// Installe Claude Code via l'installeur natif officiel.
+/// Préfère `pwsh` (PowerShell 7) puis retombe sur `powershell` (5.1) s'il est absent.
+#[tauri::command]
+pub async fn install_claude() -> Result<(), String> {
+    let out = match run_installer("pwsh").await {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => run_installer("powershell").await,
+        other => other,
+    }
+    .map_err(|e| format!("Lancement installeur : {e}"))?;
     if out.status.success() {
         Ok(())
     } else {

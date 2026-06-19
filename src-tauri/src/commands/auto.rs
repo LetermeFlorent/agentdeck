@@ -44,8 +44,10 @@ pub struct AutoPick {
 pub async fn auto_pick(prompt: String, models: Vec<String>, efforts: Vec<String>) -> AutoPick {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
+    // Connexion agentdeck indépendante : il faut notre propre token dans le coffre
+    // (une session `claude` native ne suffit pas, sinon l'UI montre « connecté » à tort).
     let token = auth::get_token();
-    if token.is_none() && !auth::claude_logged_in() {
+    if token.is_none() {
         return AutoPick::default();
     }
     let models_s = models.join(", ");

@@ -3,6 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow, UserAttentionType } from "@tauri-apps/api/window";
+import { openUrl as openExternalUrl } from "@tauri-apps/plugin-opener";
 
 export interface SessionInfo {
   id: string;
@@ -160,6 +161,9 @@ export const subscriptionPlan = () =>
 // ---- Dépendance Claude Code ----
 export const checkClaude = () => invoke<boolean>("check_claude");
 export const installClaude = () => invoke<void>("install_claude");
+
+// ---- Ouvrir une URL dans le navigateur par défaut ----
+export const openUrl = (url: string) => openExternalUrl(url);
 
 // ---- Commandes slash (liste dynamique) ----
 export interface SlashCmd {

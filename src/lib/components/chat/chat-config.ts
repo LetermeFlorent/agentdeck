@@ -51,6 +51,18 @@ export function priceOf(model: string | null | undefined): [number, number] | nu
   return PRICES[model ?? "opus"] ?? null;
 }
 
+// Commandes slash INTÉGRÉES interactives (TUI) : elles n'ont aucun effet utile en mode
+// headless `claude -p` (le mode qu'agentdeck utilise) → on les masque du popup pour ne pas
+// laisser croire qu'elles marchent. Les commandes custom / skills (deep-research, code-review,
+// statusbar…) restent affichées car elles s'exécutent comme des prompts.
+export const NON_HEADLESS_SLASH = new Set<string>([
+  "clear", "compact", "config", "context", "init", "usage", "usage-credits", "extra-usage",
+  "insights", "heapdump", "reload-skills", "goal", "team-onboarding", "model", "agents", "mcp",
+  "login", "logout", "status", "doctor", "cost", "resume", "vim", "exit", "quit", "bug", "ide",
+  "hooks", "permissions", "output-style", "memory", "add-dir", "release-notes", "privacy-settings",
+  "terminal-setup", "pr-comments", "export", "feedback", "upgrade", "statusline", "todos",
+]);
+
 /** Tokens compacts : 1234 → "1.2k". */
 export function fmtTok(n: number): string {
   return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);

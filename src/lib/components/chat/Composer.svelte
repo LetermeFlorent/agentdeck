@@ -6,7 +6,7 @@
   import SlashPopup from "./SlashPopup.svelte";
   import PermissionsPopup from "./PermissionsPopup.svelte";
   import ContextGauge from "./ContextGauge.svelte";
-  import { MODELS, effortsFor } from "./chat-config";
+  import { MODELS, effortsFor, NON_HEADLESS_SLASH } from "./chat-config";
   import { tooltip } from "$lib/actions/tooltip";
   import { fly } from "svelte/transition";
 
@@ -87,7 +87,9 @@
   const cmdMatches = $derived(
     cmdQuery === null
       ? []
-      : sessions.slashCommands.filter((c) => c.name.toLowerCase().startsWith(cmdQuery)).slice(0, 50),
+      : sessions.slashCommands
+          .filter((c) => !NON_HEADLESS_SLASH.has(c.name) && c.name.toLowerCase().startsWith(cmdQuery))
+          .slice(0, 50),
   );
   const showCmds = $derived(cmdMatches.length > 0 && !cmdDismissed);
   $effect(() => {

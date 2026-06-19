@@ -96,7 +96,8 @@ pub(super) async fn spawn(
         }
     }
 
-    // Token du coffre s'il existe ; sinon `claude` utilise ses propres credentials (connexion native).
+    // Token agentdeck (coffre) injecté pour cette session : connexion indépendante de la session
+    // `claude` native éventuelle de l'utilisateur.
     if let Some(t) = token {
         if !t.is_empty() {
             cmd.env("CLAUDE_CODE_OAUTH_TOKEN", t);

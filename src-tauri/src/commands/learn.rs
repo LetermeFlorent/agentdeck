@@ -41,8 +41,10 @@ pub async fn reflect_and_learn(
 ) -> Result<String, String> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
+    // Connexion agentdeck indépendante : il faut notre propre token dans le coffre
+    // (une session `claude` native ne suffit pas).
     let token = auth::get_token();
-    if token.is_none() && !auth::claude_logged_in() {
+    if token.is_none() {
         return Err("Non connecté.".into());
     }
 

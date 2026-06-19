@@ -238,7 +238,16 @@
       <button class="btn btn-accent" disabled={installing} onclick={installClaude}>
         {installing ? "Installation…" : "Installer Claude Code"}
       </button>
-      {#if installErr}<div class="dep-err">{installErr}</div>{/if}
+      {#if installErr}
+        <div class="dep-err">{installErr}</div>
+        <div class="dep-fallback">
+          <button class="btn-link" disabled={installing} onclick={installClaude}>Réessayer</button>
+          <span class="dep-sep">·</span>
+          <button class="btn-link" onclick={() => ipc.openUrl("https://docs.claude.com/en/docs/claude-code/setup")}>
+            Voir la doc d'installation
+          </button>
+        </div>
+      {/if}
     </div>
   </div>
 {:else if auth.checking || claudeReady === null}
@@ -415,6 +424,30 @@
     margin-top: 14px;
     font-size: 12px;
     color: var(--danger);
+  }
+  .dep-fallback {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .btn-link {
+    color: var(--accent);
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .btn-link:hover {
+    color: var(--accent-hover);
+  }
+  .btn-link:disabled {
+    opacity: 0.5;
+    text-decoration: none;
+  }
+  .dep-sep {
+    color: var(--text-faint);
   }
   .boot {
     height: 100vh;

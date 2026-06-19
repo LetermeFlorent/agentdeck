@@ -79,7 +79,7 @@ fn collect_meta(dir: &std::path::Path, depth: usize, map: &mut HashMap<String, (
 pub async fn slash_commands() -> Vec<SlashCmd> {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
     let token = auth::get_token();
-    if token.is_none() && !auth::claude_logged_in() {
+    if token.is_none() {
         return vec![];
     }
     // Map nom → (description, args), lue sur disque (skills + commandes). Dynamique.

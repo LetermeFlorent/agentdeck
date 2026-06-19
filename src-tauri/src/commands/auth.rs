@@ -6,8 +6,9 @@ use tauri_plugin_opener::OpenerExt;
 
 #[tauri::command]
 pub fn auth_status() -> bool {
-    // Connecté si on a un token dans le coffre OU si Claude Code est déjà connecté nativement.
-    auth::get_token().is_some() || auth::claude_logged_in()
+    // Connexion agentdeck INDÉPENDANTE de Claude Code : connecté uniquement si on a notre
+    // propre token dans le coffre. Une session `claude` native ne suffit pas.
+    auth::get_token().is_some()
 }
 
 #[tauri::command]
@@ -89,43 +90,29 @@ pub async fn auth_login(app: tauri::AppHandle) -> Result<(), String> {
 
     let work = async {
         let mut opened = false;
-        let mut stream_open = true;
-        loop {
-            if stream_open {
-                tokio::select! {
-                    line = rx.recv() => match line {
-                        Some(line) => {
-                            // Ouvre la 1ʳᵉ URL imprimée dans le navigateur.
-                            if !opened {
-                                if let Some(i) = line.find("https://") {
-                                    let url: String = line[i..]
-                                        .split(|c: char| c.is_whitespace() || c == '"' || c == '\'')
-                                        .next()
-                                        .unwrap_or("")
-                                        .to_string();
-                                    if url.len() > 8 {
-                                        let _ = app.opener().open_url(url, None::<String>);
-                                        opened = true;
-                                    }
-                                }
-                            }
-                            // Token imprimé (sk-ant-oat…) → on le stocke dans le coffre.
-                            if let Some(tok) = auth::extract_token_from_text(&line) {
-                                return auth::set_token(&tok);
-                            }
-                        }
-                        None => stream_open = false,
-                    },
-                    _ = tokio::time::sleep(std::time::Duration::from_millis(800)) => {}
+        // Connexion INDÉPENDANTE : on ne valide que si `setup-token` imprime un token à nous.
+        // Une session `claude` native n'est jamais considérée comme une connexion agentdeck.
+        while let Some(line) = rx.recv().await {
+            // Ouvre la 1ʳᵉ URL imprimée dans le navigateur.
+            if !opened {
+                if let Some(i) = line.find("https://") {
+                    let url: String = line[i..]
+                        .split(|c: char| c.is_whitespace() || c == '"' || c == '\'')
+                        .next()
+                        .unwrap_or("")
+                        .to_string();
+                    if url.len() > 8 {
+                        let _ = app.opener().open_url(url, None::<String>);
+                        opened = true;
+                    }
                 }
-            } else {
-                tokio::time::sleep(std::time::Duration::from_millis(800)).await;
             }
-            // Connexion native de Claude Code détectée (credentials écrits par le callback) → OK.
-            if auth::claude_logged_in() {
-                return Ok(());
+            // Token imprimé (sk-ant-oat…) → on le stocke dans le coffre.
+            if let Some(tok) = auth::extract_token_from_text(&line) {
+                return auth::set_token(&tok);
             }
         }
+        Err("Aucun token reçu. Réessaie ou colle un token manuellement.".to_string())
     };
 
     let res = match tokio::time::timeout(std::time::Duration::from_secs(240), work).await {

@@ -45,9 +45,9 @@ pub fn session_send(
     allowed: Option<String>,
     disallowed: Option<String>,
 ) -> Result<(), String> {
-    // Token du coffre si présent ; sinon on s'appuie sur la connexion native de Claude Code.
+    // Connexion agentdeck indépendante : il faut notre propre token dans le coffre.
     let token = auth::get_token();
-    if token.is_none() && !auth::claude_logged_in() {
+    if token.is_none() {
         return Err("Non connecté.".to_string());
     }
     let (proc, cwd) = mgr
