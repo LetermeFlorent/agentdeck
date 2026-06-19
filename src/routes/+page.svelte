@@ -538,6 +538,7 @@
     flex-shrink: 0;
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
+    transition: background var(--transition), border-color var(--transition);
   }
   .tab.active {
     background: var(--surface-2);
@@ -587,6 +588,7 @@
     height: 16px;
     border-radius: 4px;
     color: var(--text-faint);
+    transition: background var(--transition), color var(--transition);
     margin-right: 2px;
   }
   .tab-x:hover {

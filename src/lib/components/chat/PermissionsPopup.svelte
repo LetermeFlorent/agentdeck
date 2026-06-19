@@ -8,7 +8,7 @@
   let advanced = $state(false);
 </script>
 
-<div class="perm-pop" in:fly={{ y: 6, duration: 130 }}>
+<div class="perm-pop" transition:fly={{ y: 6, duration: 130 }}>
   <div class="sec-lbl">Mode de permission</div>
   <div class="modes">
     {#each MODES as m}
@@ -95,6 +95,11 @@
     color: var(--text-muted);
     font-size: 11px;
     text-align: left;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
+  }
+  .mode:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
   }
   .mode.on {
     color: var(--accent);

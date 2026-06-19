@@ -30,7 +30,13 @@
   const base = (p: string) => p.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || p;
 </script>
 
-<div class="ov" role="presentation" transition:fade={{ duration: 100 }} onclick={onclose}>
+<div
+  class="ov"
+  role="presentation"
+  transition:fade={{ duration: 100 }}
+  onclick={onclose}
+  onkeydown={(e) => e.key === "Escape" && onclose()}
+>
   <div class="pop" role="dialog" aria-label="Dossier de travail" transition:fly={{ y: -8, duration: 150 }} onclick={(e) => e.stopPropagation()}>
     {#if sessions.cwdRecents.length}
       <div class="sec">Récents</div>

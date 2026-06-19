@@ -29,4 +29,5 @@ dirs = "5"
 base64 = "0.22"
 reqwest = { version = "0.12", features = ["json"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+rfd = "0.15"
 

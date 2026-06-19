@@ -38,7 +38,7 @@
 </script>
 
 <div class="wrap" data-tauri-drag-region>
-  <div class="card" in:fly={{ y: 12, duration: 320, easing: cubicOut }}>
+  <div class="card" in:fly={{ y: 12, duration: 220, easing: cubicOut }}>
     <div class="brand">
       <div class="dot"></div>
       <h1>agentdeck</h1>

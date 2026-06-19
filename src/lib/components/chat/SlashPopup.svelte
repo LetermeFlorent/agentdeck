@@ -17,7 +17,7 @@
   } = $props();
 </script>
 
-<div class="cmd-pop" in:fly={{ y: 6, duration: 130 }}>
+<div class="cmd-pop" transition:fly={{ y: 6, duration: 130 }}>
   {#if onattach}
     <button type="button" class="cmd-item attach" onmousedown={(e) => { e.preventDefault(); onattach?.(); }}>
       <span class="cmd-name"><Icon name="image" size={13} /> Joindre un fichier</span>

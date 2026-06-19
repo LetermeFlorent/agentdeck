@@ -94,7 +94,7 @@
   }
   .chev {
     display: flex;
-    transition: transform var(--transition);
+    transition: transform var(--transition), color var(--transition);
   }
   .chev.open {
     transform: rotate(-90deg);

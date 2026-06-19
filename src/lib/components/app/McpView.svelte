@@ -160,6 +160,10 @@
     color: var(--accent);
     background: var(--accent-weak);
     font-size: 11.5px;
+    transition: background var(--transition), opacity var(--transition);
+  }
+  .add-btn:hover {
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
   }
   .add-form {
     display: flex;
@@ -179,6 +183,7 @@
     background: var(--bg);
     color: var(--text-muted);
     font-size: 11.5px;
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
   }
   .mt.on {
     color: var(--accent);
@@ -286,6 +291,7 @@
     color: var(--text-muted);
     border: 1px solid var(--border);
     background: var(--surface);
+    transition: background var(--transition), border-color var(--transition), color var(--transition);
   }
   .c-act.accent {
     color: var(--accent);

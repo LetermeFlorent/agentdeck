@@ -75,7 +75,7 @@
   {#if open}
     <ul class="dd-list" style={menuStyle} transition:fly={{ y: 6, duration: 150, easing: cubicOut }}>
       {#each options as o, i}
-        <li in:fly={{ y: 5, duration: 130, delay: 20 + i * 22, easing: cubicOut }}>
+        <li in:fly={{ y: 5, duration: 120, delay: Math.min(i * 10, 80), easing: cubicOut }}>
           <button
             type="button"
             class="dd-item"

@@ -110,6 +110,8 @@ export interface DirList {
   dirs: { name: string; path: string }[];
 }
 export const homeDir = () => invoke<string>("home_dir");
+export const pickFolder = (start?: string | null) =>
+  invoke<string | null>("pick_folder", { start: start ?? null });
 export const listDirs = (path?: string | null) => invoke<DirList>("list_dirs", { path: path ?? null });
 export const sessionSetCwd = (id: string, cwd: string | null) =>
   invoke<void>("session_set_cwd", { id, cwd });

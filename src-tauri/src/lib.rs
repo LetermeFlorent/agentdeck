@@ -1,4 +1,4 @@
-// agentdeck — backend Tauri. (relaunch : brouillon persistant par chat)
+// agentdeck — backend Tauri. (relaunch : chip dossier visible)
 // Pilote plusieurs sessions Claude Code (multi-IA à terme). Les commandes exposées au
 // frontend vivent dans le module `commands` (regroupées par domaine).
 
@@ -47,6 +47,7 @@ pub fn run() {
             commands::sessions::os_username,
             commands::fs::home_dir,
             commands::fs::list_dirs,
+            commands::fs::pick_folder,
             commands::slash::slash_commands,
             commands::deps::check_claude,
             commands::deps::install_claude,

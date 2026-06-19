@@ -16,6 +16,22 @@ pub struct DirList {
     pub dirs: Vec<DirEntry>,
 }
 
+/// Ouvre le vrai explorateur de fichiers du système (sélection de dossier).
+/// Renvoie le chemin choisi, ou None si annulé.
+#[tauri::command]
+pub async fn pick_folder(start: Option<String>) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut d = rfd::FileDialog::new().set_title("Choisir le dossier de travail");
+        if let Some(s) = start.filter(|s| !s.is_empty()) {
+            d = d.set_directory(s);
+        }
+        d.pick_folder().map(|p| p.display().to_string())
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 /// Dossier personnel de l'utilisateur (cwd par défaut).
 #[tauri::command]
 pub fn home_dir() -> String {

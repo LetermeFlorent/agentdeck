@@ -2,16 +2,20 @@
   import { sessions } from "$lib/stores/sessions.svelte";
   import { settings } from "$lib/stores/settings.svelte";
   import { activity } from "$lib/stores/activity.svelte";
+  import * as ipc from "$lib/ipc";
   import Icon from "../ui/Icon.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
-  import CwdPicker from "./CwdPicker.svelte";
   import { tooltip } from "$lib/actions/tooltip";
 
   let showActivity = $state(false);
-  let showCwd = $state(false);
   const actCount = $derived(activity.count(sid));
+  async function pickCwd() {
+    const p = await ipc.pickFolder(session?.cwd || sessions.homePath);
+    if (p) sessions.setCwd(sid, p);
+  }
+  const cwdPath = $derived(session?.cwd || sessions.homePath);
   const cwdBase = $derived(
-    (session?.cwd ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "dossier",
+    cwdPath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "dossier",
   );
 
   let {
@@ -94,14 +98,14 @@
         ondblclick={startEdit}
       >{session?.title ?? "Claude"}</span>
     {/if}
+    <button
+      class="cwd-chip"
+      use:tooltip={`Dossier de travail : ${cwdPath || "—"} · cliquer pour changer`}
+      onclick={(e) => { e.stopPropagation(); pickCwd(); }}
+    >
+      <Icon name="folder" size={12} /><span class="cwd-name">{cwdBase}</span>
+    </button>
   </div>
-  <button
-    class="cwd-chip"
-    use:tooltip={`Dossier de travail : ${session?.cwd || "—"} · cliquer pour changer`}
-    onclick={() => (showCwd = !showCwd)}
-  >
-    <Icon name="folder" size={12} /><span class="cwd-name">{cwdBase}</span>
-  </button>
   <div class="actions">
     {#if settings.autoModel}
       <button
@@ -167,13 +171,6 @@
   {#if showActivity}
     <ActivityPanel {sid} onclose={() => (showActivity = false)} />
   {/if}
-  {#if showCwd}
-    <CwdPicker
-      initial={session?.cwd}
-      onpick={(p) => sessions.setCwd(sid, p)}
-      onclose={() => (showCwd = false)}
-    />
-  {/if}
 </header>
 
 <style>
@@ -206,14 +203,15 @@
     align-items: center;
     gap: 4px;
     max-width: 160px;
-    margin-right: 6px;
+    margin-left: 4px;
     padding: 2px 7px;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     background: var(--bg);
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-size: 10.5px;
+    transition: color var(--transition), border-color var(--transition);
   }
   .cwd-chip:hover {
     color: var(--accent);

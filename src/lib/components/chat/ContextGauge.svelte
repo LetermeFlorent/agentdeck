@@ -83,7 +83,7 @@
   </button>
 
   {#if ctxOpen}
-    <div class="ctx-pop" in:fly={{ y: 6, duration: 140 }}>
+    <div class="ctx-pop" transition:fly={{ y: 6, duration: 140 }}>
       <div class="ctx-head">
         <span class="ctx-title">Fenêtre de contexte</span>
         <span class="ctx-big" style={`color:${ctxTone}`}>{ctxKnown ? `${ctxPct}%` : "—"}</span>

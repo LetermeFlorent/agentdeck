@@ -288,6 +288,7 @@
     font-family: var(--font-mono);
     font-size: 11px;
     font-style: italic;
+    transition: color var(--transition);
   }
   .reason-head:hover {
     color: var(--text-muted);

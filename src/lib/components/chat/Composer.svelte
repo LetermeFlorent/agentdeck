@@ -201,7 +201,7 @@
   {#if images.length}
     <div class="thumbs">
       {#each images as img, i (img.dataUrl + i)}
-        <div class="thumb" class:file={!isImage(img)} in:fly={{ y: 4, duration: 130 }}>
+        <div class="thumb" class:file={!isImage(img)} transition:fly={{ y: 4, duration: 130 }}>
           {#if isImage(img)}
             <img src={img.dataUrl} alt={img.name} />
           {:else}
@@ -296,7 +296,7 @@
       type="submit"
       disabled={!draft.trim() && images.length === 0}
       use:tooltip={session?.streaming ? "Envoyer (pris en cours de route)" : "Envoyer (Entrée)"}
-    ><Icon name="send" size={13} /></button>
+    ><Icon name="send" size={11} /></button>
   </form>
 
   <ContextGauge {sid} />
@@ -459,7 +459,7 @@
   .field {
     flex: 1 1 140px;
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 5px;
     /* min-width pour forcer le passage à la ligne (pleine largeur) en pane étroit,
        au lieu de se comprimer à ~0 à côté des boutons → saisie inutilisable. */
@@ -545,9 +545,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
+    align-self: flex-end; /* reste en bas quand le champ grandit */
+    margin-bottom: 2px;
     border-radius: var(--radius-sm);
     background: var(--accent);
     color: #fff;
