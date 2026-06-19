@@ -51,6 +51,19 @@ npm run tauri dev
 npm run tauri build
 ```
 
+## Release (mainteneur)
+
+L'auto-update consomme `latest.json` publié sur les GitHub Releases. Pour publier :
+
+1. Garde la clé de signature privée hors du repo (générée via `npm run tauri signer generate`).
+   Mets son contenu + son mot de passe dans les secrets GitHub Actions
+   `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+2. Bump la version (`package.json`, `tauri.conf.json`, `Cargo.toml`) + MAJ `CHANGELOG.md`.
+3. `git tag vX.Y.Z && git push --tags` → le workflow `.github/workflows/release.yml` build,
+   signe, crée la Release et publie installeurs + `latest.json`.
+
+Build local manuel : `npm run tauri build` (artefacts dans `src-tauri/target/release/bundle/`).
+
 ## Architecture
 
 ```
@@ -70,6 +83,16 @@ Chaque tour de conversation lance `claude -p <prompt> --output-format stream-jso
 --include-partial-messages` (1er tour : `--session-id <uuid>` ; suivants : `--resume <uuid>`),
 avec `CLAUDE_CODE_OAUTH_TOKEN` injecté en environnement.
 
+## Confidentialité
+
+- **Aucune télémétrie** : agentdeck n'envoie rien à un serveur tiers. Les seuls appels réseau
+  sortants sont ceux du CLI Claude Code (vers Anthropic) et la lecture de l'usage d'abonnement
+  via l'endpoint OAuth d'Anthropic.
+- **Token** : stocké chiffré dans le gestionnaire d'identifiants de l'OS, jamais en clair sur disque.
+- **Mode Hermes** : s'il est activé, l'agent peut **créer/modifier des fichiers skills** dans
+  `~/.claude/skills/` (global) ou `.claude/skills/` (projet) pour capitaliser ses apprentissages.
+  Désactive-le si tu ne veux pas que des fichiers soient écrits hors du dossier de travail.
+
 ## Avertissement
 
 Projet **non affilié à Anthropic**. *Claude* et *Claude Code* sont des marques d'Anthropic ;
@@ -79,4 +102,6 @@ gestionnaire d'identifiants de l'OS.
 
 ## Licence
 
-[MIT](LICENSE) © 2026 Florent Leterme.
+[PolyForm Noncommercial 1.0.0](LICENSE) © 2026 Florent Leterme.
+Usage personnel et non-commercial libre ; la revente / l'usage commercial nécessitent une
+licence séparée.

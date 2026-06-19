@@ -20,6 +20,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["process", "io-util", "rt", "macros", "sync", "time"] }
@@ -31,4 +32,8 @@ base64 = "0.22"
 reqwest = { version = "0.12", features = ["json"] }
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 rfd = "0.15"
+
+# Auto-update (desktop). L'updater n'existe pas sur mobile.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
 

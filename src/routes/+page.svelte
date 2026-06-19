@@ -17,6 +17,7 @@
   import HistoryPopup from "$lib/components/app/HistoryPopup.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
+  import { checkForUpdates } from "$lib/updater";
   import * as ipc from "$lib/ipc";
 
   let initialized = $state(false);
@@ -92,6 +93,7 @@
   onMount(async () => {
     theme.init();
     settings.load();
+    checkForUpdates(); // auto-update en arrière-plan (silencieux si rien à faire)
     try {
       username = await ipc.osUsername();
     } catch {

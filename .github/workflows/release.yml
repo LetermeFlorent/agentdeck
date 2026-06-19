@@ -1,0 +1,49 @@
+name: release
+
+# Publie une release signée à chaque tag `vX.Y.Z`.
+# tauri-action build l'app, signe les artefacts updater, crée la GitHub Release et y publie
+# les installeurs + `latest.json` (consommé par l'auto-update de l'app).
+#
+# Secrets requis (Settings → Secrets and variables → Actions) :
+#   TAURI_SIGNING_PRIVATE_KEY           contenu de ~/.agentdeck-keys/agentdeck.key
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  mot de passe de la clé (vide si générée sans)
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Ajoute `macos-latest` / `ubuntu-22.04` ici pour des builds multiplateformes.
+        platform: [windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "agentdeck ${{ github.ref_name }}"
+          releaseBody: "Voir le CHANGELOG."
+          releaseDraft: false
+          prerelease: false
