@@ -32,6 +32,13 @@
 
   const session = $derived(sessions.map[sid]);
   const collapsed = $derived(session?.collapsed ?? false);
+  // Flèche de dépli : pointe vers où le pane va s'ouvrir (opposé du bord de repli).
+  // chevron de base = bas. column: a(haut)→bas(0) b(bas)→haut(180) ; row: a(gauche)→droite(-90) b(droite)→gauche(90).
+  const expandRot = $derived(
+    collapseDir === "column"
+      ? collapseSide === "a" ? 0 : 180
+      : collapseSide === "a" ? -90 : 90,
+  );
 
   let dragOver = $state(false);
   function dragOverH(e: DragEvent) {
@@ -66,7 +73,7 @@
       onclick={() => sessions.setCollapsed(sid, false)}
       onkeydown={(e) => e.key === "Enter" && sessions.setCollapsed(sid, false)}
     >
-      <span class="chev open"><Icon name="chevron" size={14} /></span>
+      <span class="chev" style={`transform: rotate(${expandRot}deg)`}><Icon name="chevron" size={14} /></span>
       <span class="status" class:live={session?.streaming}></span>
       <span class="strip-title">{session?.title ?? "Claude"}</span>
       <span class="strip-state" class:work={session?.streaming}></span>
@@ -99,9 +106,6 @@
     display: flex;
     transition: transform var(--transition), color var(--transition);
   }
-  .chev.open {
-    transform: rotate(-90deg);
-  }
   /* Bande latérale quand le chat est minimisé sur le côté */
   .strip {
     height: 100%;
@@ -118,7 +122,7 @@
   .strip:hover {
     background: var(--elevated);
   }
-  .strip:hover .chev.open {
+  .strip:hover .chev {
     color: var(--accent);
   }
   /* Bande horizontale (chat minimisé en haut/bas d'un split vertical). */
