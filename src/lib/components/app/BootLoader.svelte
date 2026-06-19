@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Écran de démarrage : mascotte agentdeck en PIXEL ART (grille de pixels SVG) + lignes de boot.
+  // Écran de démarrage : spark Claude propre (12 branches effilées, généré) + lignes de boot.
   import { fly } from "svelte/transition";
 
   let { username = "" }: { username?: string } = $props();
@@ -13,35 +13,31 @@
   let frame = $state(0);
   let step = $state(0);
 
-  // Grille 12x12. Légende : A=antenne, B=corps, E=œil droit, L=œil gauche (clin), M=bouche,
-  // D=carte du "deck". '.' = transparent.
-  const GRID = [
-    ".....AA.....",
-    ".....AA.....",
-    "..BBBBBBBB..",
-    ".BBBBBBBBBB.",
-    "BBBBBBBBBBBB",
-    "BB.LL..EE.BB",
-    "BB.LL..EE.BB",
-    "BBBBBBBBBBBB",
-    "BB.MMMMMM.BB",
-    ".BBBBBBBBBB.",
-    "..BBBBBBBB..",
-    ".DD.DD.DD...",
-  ];
-  const COLOR: Record<string, string> = {
-    A: "var(--accent)",
-    B: "var(--accent)",
-    E: "#fff",
-    L: "#fff",
-    M: "#fff",
-    D: "var(--accent)",
-  };
-  const cells = GRID.flatMap((row, y) =>
-    [...row].flatMap((ch, x) =>
-      ch === "." ? [] : [{ x, y, fill: COLOR[ch], cls: ch === "L" ? "eye-l" : ch === "A" ? "bulb" : "", op: ch === "D" ? 0.5 : 1 }],
-    ),
-  );
+  // Spark généré : 12 branches effilées + cœur. Symétrique et net (pas une pixelisation floue).
+  const N = 28;
+  const c = N / 2;
+  const SPOKES = 12;
+  const R = 13;
+  const CORE = 2.4;
+  const W0 = 0.42; // demi-largeur angulaire à la base
+  const BASE = "#d97757";
+  const COREC = "#ecaf95";
+  const cells: { x: number; y: number; fill: string }[] = [];
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const dx = x + 0.5 - c;
+      const dy = y + 0.5 - c;
+      const r = Math.hypot(dx, dy);
+      if (r > R) continue;
+      const th = Math.atan2(dy, dx);
+      const a = (2 * Math.PI) / SPOKES;
+      const d = Math.abs(th - Math.round(th / a) * a);
+      const halfw = W0 * (1 - r / R);
+      if (r <= CORE || d <= halfw) {
+        cells.push({ x, y, fill: r < CORE * 1.25 ? COREC : BASE });
+      }
+    }
+  }
 
   $effect(() => {
     const iv = setInterval(() => (frame = (frame + 1) % FRAMES.length), 120);
@@ -55,26 +51,23 @@
 
 <div class="boot-screen" data-tauri-drag-region>
   <div class="stage" in:fly={{ y: 10, duration: 240 }}>
-    <!-- Mascotte agentdeck en pixel art. -->
     <svg
       class="mascot"
-      viewBox="0 0 12 12"
-      width="108"
-      height="108"
+      viewBox="0 0 {N} {N}"
+      width="92"
+      height="92"
       shape-rendering="crispEdges"
       aria-hidden="true"
     >
-      {#each cells as c}
-        <rect
-          class={c.cls}
-          x={c.x}
-          y={c.y}
-          width="1"
-          height="1"
-          fill={c.fill}
-          opacity={c.op}
-        />
-      {/each}
+      <g class="halo">
+        <g class="halo-in">
+          {#each cells as p}
+            <rect x={p.x} y={p.y} width="1" height="1" fill={p.fill} />
+          {/each}
+        </g>
+      </g>
+      <!-- pulsation lumineuse au centre -->
+      <circle class="pulse" cx={c} cy={c} r="3.4" fill="#fff" />
     </svg>
 
     <p class="hello">
@@ -114,45 +107,35 @@
     gap: 14px;
     font-family: var(--font-mono);
   }
+  /* Spark statique. Seuls le glow et le cœur s'animent. */
   .mascot {
     image-rendering: pixelated;
-    animation: float 3s steps(3) infinite;
-    filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.18));
+    animation: glow 2.6s ease-in-out infinite;
   }
-  /* Flottement par pas (rendu "jeu rétro"). */
-  @keyframes float {
+  @keyframes glow {
+    0%,
+    100% {
+      filter: drop-shadow(0 6px 10px rgba(156, 74, 48, 0.3));
+    }
     50% {
-      transform: translateY(-6px);
+      filter: drop-shadow(0 6px 18px rgba(217, 119, 87, 0.65));
     }
   }
-  /* Clin d'œil : les pixels de l'œil gauche se replient brièvement. */
-  .eye-l {
+  /* Pulsation du cœur. */
+  .pulse {
     transform-box: fill-box;
     transform-origin: center;
-    animation: wink 3.2s steps(1) infinite;
+    animation: corepulse 2.6s ease-in-out infinite;
   }
-  @keyframes wink {
-    0%,
-    88%,
-    100% {
-      transform: scaleY(1);
-    }
-    92%,
-    96% {
-      transform: scaleY(0.05);
-    }
-  }
-  /* Antenne qui clignote. */
-  .bulb {
-    animation: twinkle 1.4s steps(2) infinite;
-  }
-  @keyframes twinkle {
+  @keyframes corepulse {
     0%,
     100% {
-      opacity: 0.45;
+      transform: scale(0.5);
+      opacity: 0.15;
     }
     50% {
-      opacity: 1;
+      transform: scale(1.15);
+      opacity: 0.6;
     }
   }
   .hello {

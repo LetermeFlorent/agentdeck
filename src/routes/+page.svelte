@@ -17,6 +17,7 @@
   import HistoryPopup from "$lib/components/app/HistoryPopup.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
+  import SparkMark from "$lib/components/ui/SparkMark.svelte";
   import { checkForUpdates } from "$lib/updater";
   import * as ipc from "$lib/ipc";
 
@@ -266,7 +267,7 @@
     <!-- Titlebar custom : barre app + contrôles système fusionnés (déco OS désactivée). -->
     <header class="topbar" data-tauri-drag-region>
       <div class="brand" data-tauri-drag-region>
-        <div class="dot" data-tauri-drag-region></div>
+        <span class="mark" data-tauri-drag-region><SparkMark size={16} /></span>
         <span class="logo" data-tauri-drag-region>agentdeck</span>
         {#if plan.label}
           <span class="plan plan-{plan.level}" data-tauri-drag-region use:tooltip={`Abonnement Claude : ${plan.label}`}>
@@ -497,11 +498,9 @@
     align-items: center;
     gap: 9px;
   }
-  .dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 3px;
-    background: var(--accent);
+  .mark {
+    display: flex;
+    align-items: center;
   }
   .logo {
     font-family: var(--font-mono);
