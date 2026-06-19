@@ -15,6 +15,14 @@ use usage::UsageStore;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir { file_name: Some("agentdeck".into()) },
+                ))
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init());
     // Auto-update : disponible uniquement sur desktop.
@@ -29,13 +37,6 @@ pub fn run() {
             // Poller de fond : vrai usage d'abonnement via l'endpoint OAuth.
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(usage::run_poller(handle));
-            // Met à jour Claude Code au démarrage (best-effort, non bloquant).
-            tauri::async_runtime::spawn(async {
-                let _ = tokio::process::Command::new(provider::claude_code::claude_bin())
-                    .arg("update")
-                    .output()
-                    .await;
-            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

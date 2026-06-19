@@ -92,6 +92,14 @@ avec `CLAUDE_CODE_OAUTH_TOKEN` injecté en environnement.
 - **Mode Hermes** : s'il est activé, l'agent peut **créer/modifier des fichiers skills** dans
   `~/.claude/skills/` (global) ou `.claude/skills/` (projet) pour capitaliser ses apprentissages.
   Désactive-le si tu ne veux pas que des fichiers soient écrits hors du dossier de travail.
+- **Permissions des agents** : par défaut les sessions tournent en `bypassPermissions` (mode
+  headless) — l'agent exécute ses outils (édition, shell…) **sans confirmation**. C'est
+  nécessaire au pilotage non-interactif. Restreins-le par session via les **règles d'outils**
+  (`allowedTools` / `disallowedTools`) ou choisis un autre mode de permission. Ne fais tourner
+  que des prompts de confiance.
+
+> Journaux : un fichier de log est écrit dans le dossier de logs de l'app (utile pour signaler
+> un bug). Aucune donnée n'en sort de ta machine.
 
 ## Avertissement
 

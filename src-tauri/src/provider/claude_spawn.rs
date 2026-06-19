@@ -138,7 +138,7 @@ pub(super) async fn spawn(
                 if line.is_empty() {
                     continue;
                 }
-                eprintln!("[claude stderr] {line}");
+                log::warn!("[claude stderr] {line}");
                 if tail.len() == MAX_LINES {
                     tail.remove(0);
                 }

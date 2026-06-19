@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Écran de démarrage : vrai logo Claude (burst/étincelle) animé + lignes de boot, à plat.
+  // Écran de démarrage : mascotte agentdeck en PIXEL ART (grille de pixels SVG) + lignes de boot.
   import { fly } from "svelte/transition";
 
   let { username = "" }: { username?: string } = $props();
@@ -13,23 +13,35 @@
   let frame = $state(0);
   let step = $state(0);
 
-  // Logo Claude : rayons radiaux de longueurs irrégulières (aspect "étincelle" organique).
-  const CX = 50;
-  const CY = 50;
-  const INNER = 7;
-  const RAY_LENS = [40, 31, 38, 30, 39, 32, 40, 30, 37, 33, 39, 31];
-  const rays = RAY_LENS.map((len, i) => {
-    const a = (i * 360) / RAY_LENS.length;
-    const rad = (a * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    return {
-      x1: CX + INNER * cos,
-      y1: CY + INNER * sin,
-      x2: CX + (INNER + len) * cos,
-      y2: CY + (INNER + len) * sin,
-    };
-  });
+  // Grille 12x12. Légende : A=antenne, B=corps, E=œil droit, L=œil gauche (clin), M=bouche,
+  // D=carte du "deck". '.' = transparent.
+  const GRID = [
+    ".....AA.....",
+    ".....AA.....",
+    "..BBBBBBBB..",
+    ".BBBBBBBBBB.",
+    "BBBBBBBBBBBB",
+    "BB.LL..EE.BB",
+    "BB.LL..EE.BB",
+    "BBBBBBBBBBBB",
+    "BB.MMMMMM.BB",
+    ".BBBBBBBBBB.",
+    "..BBBBBBBB..",
+    ".DD.DD.DD...",
+  ];
+  const COLOR: Record<string, string> = {
+    A: "var(--accent)",
+    B: "var(--accent)",
+    E: "#fff",
+    L: "#fff",
+    M: "#fff",
+    D: "var(--accent)",
+  };
+  const cells = GRID.flatMap((row, y) =>
+    [...row].flatMap((ch, x) =>
+      ch === "." ? [] : [{ x, y, fill: COLOR[ch], cls: ch === "L" ? "eye-l" : ch === "A" ? "bulb" : "", op: ch === "D" ? 0.5 : 1 }],
+    ),
+  );
 
   $effect(() => {
     const iv = setInterval(() => (frame = (frame + 1) % FRAMES.length), 120);
@@ -43,21 +55,26 @@
 
 <div class="boot-screen" data-tauri-drag-region>
   <div class="stage" in:fly={{ y: 10, duration: 240 }}>
-    <!-- Vrai logo Claude : étincelle radiale, couleur Claude orange. -->
-    <svg class="logo" viewBox="0 0 100 100" width="92" height="92" aria-hidden="true">
-      <g class="burst">
-        {#each rays as r}
-          <line
-            x1={r.x1}
-            y1={r.y1}
-            x2={r.x2}
-            y2={r.y2}
-            stroke="#d97757"
-            stroke-width="7"
-            stroke-linecap="round"
-          />
-        {/each}
-      </g>
+    <!-- Mascotte agentdeck en pixel art. -->
+    <svg
+      class="mascot"
+      viewBox="0 0 12 12"
+      width="108"
+      height="108"
+      shape-rendering="crispEdges"
+      aria-hidden="true"
+    >
+      {#each cells as c}
+        <rect
+          class={c.cls}
+          x={c.x}
+          y={c.y}
+          width="1"
+          height="1"
+          fill={c.fill}
+          opacity={c.op}
+        />
+      {/each}
     </svg>
 
     <p class="hello">
@@ -97,28 +114,44 @@
     gap: 14px;
     font-family: var(--font-mono);
   }
-  .logo {
-    animation: pulse 2.4s ease-in-out infinite;
-    filter: drop-shadow(0 8px 22px rgba(217, 119, 87, 0.35));
+  .mascot {
+    image-rendering: pixelated;
+    animation: float 3s steps(3) infinite;
+    filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.18));
   }
-  /* Rotation lente + battement doux de l'étincelle. */
-  .burst {
-    transform-origin: 50px 50px;
-    animation: spin 16s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
+  /* Flottement par pas (rendu "jeu rétro"). */
+  @keyframes float {
+    50% {
+      transform: translateY(-6px);
     }
   }
-  @keyframes pulse {
+  /* Clin d'œil : les pixels de l'œil gauche se replient brièvement. */
+  .eye-l {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: wink 3.2s steps(1) infinite;
+  }
+  @keyframes wink {
+    0%,
+    88%,
+    100% {
+      transform: scaleY(1);
+    }
+    92%,
+    96% {
+      transform: scaleY(0.05);
+    }
+  }
+  /* Antenne qui clignote. */
+  .bulb {
+    animation: twinkle 1.4s steps(2) infinite;
+  }
+  @keyframes twinkle {
     0%,
     100% {
-      transform: scale(0.94);
-      opacity: 0.9;
+      opacity: 0.45;
     }
     50% {
-      transform: scale(1);
       opacity: 1;
     }
   }
