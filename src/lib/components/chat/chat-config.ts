@@ -7,6 +7,16 @@ export const MODELS = [
   { v: "fable", l: "Fable" },
 ];
 
+/** Modes de permission du CLI Claude Code (--permission-mode). */
+export const PERM_MODES = [
+  { v: "bypassPermissions", l: "Tout autoriser" },
+  { v: "acceptEdits", l: "Auto-éditer" },
+  { v: "default", l: "Par défaut" },
+  { v: "plan", l: "Plan (lecture seule)" },
+  { v: "auto", l: "Auto" },
+  { v: "dontAsk", l: "Ne pas demander" },
+];
+
 const LOW = { v: "low", l: "Low" };
 const MEDIUM = { v: "medium", l: "Medium" };
 const HIGH = { v: "high", l: "High" };

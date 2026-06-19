@@ -40,6 +40,10 @@ pub fn session_send(
     model: Option<String>,
     effort: Option<String>,
     images: Option<Vec<provider::claude_code::ImageInput>>,
+    hermes: Option<bool>,
+    perm_mode: Option<String>,
+    allowed: Option<String>,
+    disallowed: Option<String>,
 ) -> Result<(), String> {
     // Token du coffre si présent ; sinon on s'appuie sur la connexion native de Claude Code.
     let token = auth::get_token();
@@ -60,6 +64,10 @@ pub fn session_send(
         token,
         text,
         images.unwrap_or_default(),
+        hermes.unwrap_or(false),
+        perm_mode,
+        allowed,
+        disallowed,
     ));
     Ok(())
 }

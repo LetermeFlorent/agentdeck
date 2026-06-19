@@ -9,6 +9,12 @@ interface Persisted {
   unavailableModels: string[];
   privateAfterMin: number | null;
   defaultZoom: number;
+  hermesMode: boolean;
+  defaultPermMode: string;
+  autoEffort: boolean;
+  autoModel: boolean;
+  autoModels: string[];
+  autoEfforts: string[];
 }
 
 class SettingsStore {
@@ -24,6 +30,18 @@ class SettingsStore {
   privateAfterMin = $state<number | null>(null);
   /** Zoom par défaut des nouveaux chats (1 = 100%). */
   defaultZoom = $state(1);
+  /** Mode Hermes : l'agent consulte/crée des skills et apprend de ses erreurs (auto). */
+  hermesMode = $state(false);
+  /** Mode de permission par défaut des nouveaux chats. */
+  defaultPermMode = $state("bypassPermissions");
+  /** Auto-effort : choisit l'effort adapté à chaque demande (appel Haiku). */
+  autoEffort = $state(false);
+  /** Auto-modèle : choisit aussi le modèle (seulement si autoEffort actif). */
+  autoModel = $state(false);
+  /** Modèles parmi lesquels l'auto peut choisir (défaut : tous sauf Fable). */
+  autoModels = $state<string[]>(["opus", "sonnet", "haiku"]);
+  /** Efforts parmi lesquels l'auto peut choisir (défaut : tous). */
+  autoEfforts = $state<string[]>(["low", "medium", "high", "xhigh", "max"]);
 
   load() {
     try {
@@ -36,6 +54,12 @@ class SettingsStore {
       this.unavailableModels = p.unavailableModels ?? [];
       this.privateAfterMin = p.privateAfterMin ?? null;
       this.defaultZoom = p.defaultZoom ?? 1;
+      this.hermesMode = p.hermesMode ?? false;
+      this.defaultPermMode = p.defaultPermMode ?? "bypassPermissions";
+      this.autoEffort = p.autoEffort ?? false;
+      this.autoModel = p.autoModel ?? false;
+      this.autoModels = p.autoModels ?? ["opus", "sonnet", "haiku"];
+      this.autoEfforts = p.autoEfforts ?? ["low", "medium", "high", "xhigh", "max"];
     } catch {
       /* ignore */
     }
@@ -49,6 +73,12 @@ class SettingsStore {
       unavailableModels: this.unavailableModels,
       privateAfterMin: this.privateAfterMin,
       defaultZoom: this.defaultZoom,
+      hermesMode: this.hermesMode,
+      defaultPermMode: this.defaultPermMode,
+      autoEffort: this.autoEffort,
+      autoModel: this.autoModel,
+      autoModels: this.autoModels,
+      autoEfforts: this.autoEfforts,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(p));
@@ -77,6 +107,38 @@ class SettingsStore {
   /** Zoom par défaut des nouveaux chats, borné à [0.6, 1.8]. */
   setDefaultZoom(v: number) {
     this.defaultZoom = Math.min(1.8, Math.max(0.6, Math.round(v * 100) / 100));
+    this.save();
+  }
+
+  setHermesMode(v: boolean) {
+    this.hermesMode = v;
+    this.save();
+  }
+  setDefaultPermMode(v: string) {
+    this.defaultPermMode = v || "bypassPermissions";
+    this.save();
+  }
+  setAutoEffort(v: boolean) {
+    this.autoEffort = v;
+    if (!v) this.autoModel = false; // auto-modèle dépend d'auto-effort
+    this.save();
+  }
+  setAutoModel(v: boolean) {
+    this.autoModel = v;
+    this.save();
+  }
+  /** Coche/décoche un modèle de la liste auto. */
+  toggleAutoModelChoice(model: string) {
+    this.autoModels = this.autoModels.includes(model)
+      ? this.autoModels.filter((m) => m !== model)
+      : [...this.autoModels, model];
+    this.save();
+  }
+  /** Coche/décoche un effort de la liste auto. */
+  toggleAutoEffortChoice(effort: string) {
+    this.autoEfforts = this.autoEfforts.includes(effort)
+      ? this.autoEfforts.filter((e) => e !== effort)
+      : [...this.autoEfforts, effort];
     this.save();
   }
 

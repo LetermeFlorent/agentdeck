@@ -54,7 +54,12 @@ pub(super) fn handle_line(
                 .and_then(Value::as_array)
                 .map(|a| a.iter().filter_map(|c| c.as_str().map(String::from)).collect())
                 .unwrap_or_default();
-            emit(app, id, SessionEvent::Init { slash_commands: cmds });
+            let tools: Vec<String> = v
+                .get("tools")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(|c| c.as_str().map(String::from)).collect())
+                .unwrap_or_default();
+            emit(app, id, SessionEvent::Init { slash_commands: cmds, tools });
         }
         Some("stream_event") => {
             let ev = match v.get("event") {
@@ -161,6 +166,9 @@ pub(super) fn handle_line(
             let context = input + cache;
             let total = input + output + cache;
             let cost = v.get("total_cost_usd").and_then(Value::as_f64).unwrap_or(0.0);
+            // Échec du tour : `is_error` ou un `subtype` autre que "success".
+            let is_error = v.get("is_error").and_then(Value::as_bool).unwrap_or(false)
+                || v.get("subtype").and_then(Value::as_str).map(|s| s != "success").unwrap_or(false);
             // Fenêtre de contexte réelle du modèle (dynamique) : max des contextWindow
             // rapportés dans modelUsage (un tour peut toucher plusieurs modèles).
             let context_window = v
@@ -184,6 +192,7 @@ pub(super) fn handle_line(
                     cost_usd: cost,
                     context_tokens: context,
                     context_window,
+                    is_error,
                 },
             );
         }

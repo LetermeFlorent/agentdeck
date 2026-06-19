@@ -1,4 +1,4 @@
-// agentdeck — backend Tauri.
+// agentdeck — backend Tauri. (relaunch : listes auto + redesign settings)
 // Pilote plusieurs sessions Claude Code (multi-IA à terme). Les commandes exposées au
 // frontend vivent dans le module `commands` (regroupées par domaine).
 
@@ -50,6 +50,16 @@ pub fn run() {
             commands::meta::usage_get,
             commands::meta::claude_defaults,
             commands::meta::subscription_plan,
+            commands::library::skills_installed,
+            commands::library::skill_write,
+            commands::library::skill_delete,
+            commands::library::mcp_installed,
+            commands::library::mcp_add,
+            commands::library::mcp_add_json,
+            commands::library::mcp_remove,
+            commands::learn::reflect_and_learn,
+            commands::auto::effort_levels,
+            commands::auto::auto_pick,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

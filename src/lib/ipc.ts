@@ -36,14 +36,14 @@ export interface UsageSnapshot {
 // Events émis par le backend sur session://{id} (tag "kind", snake_case).
 export type SessionEvent =
   | { kind: "started" }
-  | { kind: "init"; slash_commands: string[] }
+  | { kind: "init"; slash_commands: string[]; tools: string[] }
   | { kind: "assistant_start" }
   | { kind: "assistant_delta"; text: string }
   | { kind: "thinking"; text: string }
   | { kind: "tool_use"; name: string; input: string }
   | { kind: "tool_result"; ok: boolean }
   | { kind: "progress"; output_tokens: number }
-  | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number; context_tokens: number; context_window: number }
+  | { kind: "turn_done"; input_tokens: number; output_tokens: number; total_tokens: number; cost_usd: number; context_tokens: number; context_window: number; is_error: boolean }
   | { kind: "error"; message: string }
   | { kind: "exited"; code: number | null };
 
@@ -83,6 +83,8 @@ export const sessionSend = (
   model?: string | null,
   effort?: string | null,
   images?: ImageInput[],
+  hermes?: boolean,
+  perm?: { mode?: string | null; allowed?: string | null; disallowed?: string | null },
 ) =>
   invoke<void>("session_send", {
     id,
@@ -90,7 +92,24 @@ export const sessionSend = (
     model: model ?? null,
     effort: effort ?? null,
     images: images ?? [],
+    hermes: hermes ?? false,
+    permMode: perm?.mode ?? null,
+    allowed: perm?.allowed ?? null,
+    disallowed: perm?.disallowed ?? null,
   });
+
+// ---- Mode Auto : niveaux d'effort dynamiques + choix modèle/effort par Haiku ----
+export const effortLevels = () => invoke<string[]>("effort_levels");
+export const autoPick = (prompt: string, models: string[], efforts: string[]) =>
+  invoke<{ model: string; effort: string }>("auto_pick", { prompt, models, efforts });
+
+// ---- Mode Hermes : réflexion auto sur échec → écrit un skill ----
+export const reflectAndLearn = (
+  cwd: string | null,
+  request: string,
+  summary: string,
+  error: string,
+) => invoke<string>("reflect_and_learn", { cwd: cwd ?? null, request, summary, error });
 export const sessionStop = (id: string) => invoke<void>("session_stop", { id });
 export const sessionClose = (id: string) => invoke<void>("session_close", { id });
 
@@ -117,6 +136,29 @@ export interface SlashCmd {
   args: string;
 }
 export const slashCommandsFetch = () => invoke<SlashCmd[]>("slash_commands");
+
+// ---- Bibliothèque : skills + MCP ----
+export interface SkillItem {
+  name: string;
+  description: string;
+}
+export interface McpItem {
+  name: string;
+  target: string;
+  status: string;
+  scope: string;
+  removable: boolean;
+}
+export const skillsInstalled = () => invoke<SkillItem[]>("skills_installed");
+export const skillWrite = (name: string, content: string) =>
+  invoke<void>("skill_write", { name, content });
+export const skillDelete = (name: string) => invoke<void>("skill_delete", { name });
+export const mcpInstalled = () => invoke<McpItem[]>("mcp_installed");
+export const mcpAdd = (name: string, target: string, transport?: string) =>
+  invoke<void>("mcp_add", { name, target, transport: transport ?? null });
+export const mcpAddJson = (name: string, json: string) =>
+  invoke<void>("mcp_add_json", { name, json });
+export const mcpRemove = (name: string) => invoke<void>("mcp_remove", { name });
 
 // ---- Nom d'utilisateur du PC (accueil démarrage) ----
 export const osUsername = () => invoke<string>("os_username");

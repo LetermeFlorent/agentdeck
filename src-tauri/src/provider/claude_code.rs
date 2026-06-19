@@ -113,22 +113,32 @@ pub async fn send(
     token: Option<String>,
     text: String,
     images: Vec<ImageInput>,
+    hermes: bool,
+    perm_mode: Option<String>,
+    allowed: Option<String>,
+    disallowed: Option<String>,
 ) {
     let mut guard = proc.lock().await;
     // Reprend la conversation si Claude a déjà persisté cette session ; sinon la crée.
     let resume = session_exists(&id);
 
-    // (Re)lance si pas de process, ou si le modèle/effort a changé.
+    // (Re)lance si pas de process, ou si le modèle/effort/permissions ont changé.
     let need_spawn = match &*guard {
         None => true,
-        Some(p) => p.model != model || p.effort != effort,
+        Some(p) => {
+            p.model != model
+                || p.effort != effort
+                || p.perm_mode != perm_mode
+                || p.allowed != allowed
+                || p.disallowed != disallowed
+        }
     };
     if need_spawn {
         if let Some(old) = guard.take() {
             let mut c = old.child;
             let _ = c.start_kill();
         }
-        match spawn(&app, &id, &cwd, &model, &effort, &token, resume).await {
+        match spawn(&app, &id, &cwd, &model, &effort, &token, resume, hermes, &perm_mode, &allowed, &disallowed).await {
             Ok(p) => *guard = Some(p),
             Err(e) => {
                 emit(&app, &id, SessionEvent::Error { message: e });
@@ -166,7 +176,7 @@ pub async fn send(
             let _ = c.start_kill();
         }
         let retry_resume = if need_spawn { !resume } else { true };
-        match spawn(&app, &id, &cwd, &model, &effort, &token, retry_resume).await {
+        match spawn(&app, &id, &cwd, &model, &effort, &token, retry_resume, hermes, &perm_mode, &allowed, &disallowed).await {
             Ok(p) => *guard = Some(p),
             Err(e) => {
                 emit(&app, &id, SessionEvent::Error { message: e });

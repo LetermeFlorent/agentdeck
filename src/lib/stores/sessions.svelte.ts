@@ -5,6 +5,7 @@ import type { SessionEvent } from "$lib/ipc";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
+import { PERM_MODES, MODELS, effortsFor } from "$lib/components/chat/chat-config";
 
 export interface ToolCall {
   name: string;
@@ -51,6 +52,21 @@ export interface SessionState {
   lastActivity: number;
   /** Zoom du chat (1 = 100%) — boutons +/− de l'entête. */
   zoom: number;
+  /** Mode de permission Claude Code (bypassPermissions par défaut). */
+  permMode: string;
+  /** Outils décochés (refusés) → passés en --disallowedTools. */
+  disabledTools: string[];
+  /** Règles avancées d'outils autorisés (motifs, ex. "Bash(git *)"). */
+  allowRules: string;
+  /** Règles avancées d'outils refusés (motifs). */
+  denyRules: string;
+  /** Bulles transitoires près des contrôles après un cycle clavier (Ctrl+Tab/M/E). */
+  permFlash: string;
+  modelFlash: string;
+  effortFlash: string;
+  /** Désactive l'auto-modèle / auto-effort uniquement pour ce chat (override du global). */
+  autoModelOff: boolean;
+  autoEffortOff: boolean;
 }
 
 export interface PersistedSession {
@@ -67,6 +83,12 @@ export interface PersistedSession {
   contextTokens?: number;
   contextWindow?: number;
   zoom?: number;
+  permMode?: string;
+  disabledTools?: string[];
+  allowRules?: string;
+  denyRules?: string;
+  autoModelOff?: boolean;
+  autoEffortOff?: boolean;
 }
 
 class SessionsStore {
@@ -78,6 +100,12 @@ class SessionsStore {
   defaultEffort = $state<string | null>(null);
   /** Commandes slash exposées par Claude Code (nom + description, récupérées dynamiquement). */
   slashCommands = $state<ipc.SlashCmd[]>([]);
+  /** Outils disponibles exposés par Claude Code (init), pour le panneau Permissions. */
+  tools = $state<string[]>([]);
+  /** Chat actuellement focus (composer) — cible des raccourcis clavier (Ctrl+Tab). */
+  focusedSid = $state("");
+  /** Niveaux d'effort valides (lus dynamiquement du CLI), pour le mode auto. */
+  effortLevels = $state<string[]>([]);
   private unlisteners: Record<string, UnlistenFn> = {};
   private privacyTimer: number | null = null;
   private slashFetched = false;
@@ -157,7 +185,17 @@ class SessionsStore {
       contextWindow: 0,
       lastActivity: Date.now(),
       zoom: settings.defaultZoom ?? 1,
+      permMode: settings.defaultPermMode ?? "bypassPermissions",
+      disabledTools: [],
+      allowRules: "",
+      denyRules: "",
+      permFlash: "",
+      modelFlash: "",
+      effortFlash: "",
+      autoModelOff: false,
+      autoEffortOff: false,
     };
+    this.focusedSid = id;
     await this.attach(id);
     this.touch();
     return id;
@@ -192,6 +230,15 @@ class SessionsStore {
         contextWindow: p.contextWindow ?? 0,
         lastActivity: Date.now(),
         zoom: p.zoom ?? 1,
+        permMode: p.permMode ?? "bypassPermissions",
+        disabledTools: p.disabledTools ?? [],
+        allowRules: p.allowRules ?? "",
+        denyRules: p.denyRules ?? "",
+        permFlash: "",
+        modelFlash: "",
+        effortFlash: "",
+        autoModelOff: p.autoModelOff ?? false,
+        autoEffortOff: p.autoEffortOff ?? false,
       };
       await this.attach(p.id);
     }
@@ -214,6 +261,12 @@ class SessionsStore {
       contextTokens: s.contextTokens,
       contextWindow: s.contextWindow,
       zoom: s.zoom,
+      permMode: s.permMode,
+      disabledTools: s.disabledTools,
+      allowRules: s.allowRules,
+      denyRules: s.denyRules,
+      autoModelOff: s.autoModelOff,
+      autoEffortOff: s.autoEffortOff,
     }));
   }
 
@@ -263,6 +316,91 @@ class SessionsStore {
     this.touch();
   }
 
+  /** Permissions du pane (appliquées au prochain tour → respawn du process). */
+  setPermMode(id: string, mode: string) {
+    const s = this.map[id];
+    if (!s) return;
+    s.permMode = mode || "bypassPermissions";
+    this.touch();
+  }
+  /** Bascule un outil autorisé/refusé (refusé = présent dans disabledTools). */
+  toggleTool(id: string, tool: string) {
+    const s = this.map[id];
+    if (!s) return;
+    s.disabledTools = s.disabledTools.includes(tool)
+      ? s.disabledTools.filter((t) => t !== tool)
+      : [...s.disabledTools, tool];
+    this.touch();
+  }
+  setAllowRules(id: string, v: string) {
+    const s = this.map[id];
+    if (s) { s.allowRules = v; this.touch(); }
+  }
+  setDenyRules(id: string, v: string) {
+    const s = this.map[id];
+    if (s) { s.denyRules = v; this.touch(); }
+  }
+
+  /** Mémorise le chat focus (cible des raccourcis clavier). */
+  setFocused(id: string) {
+    this.focusedSid = id;
+  }
+  /** Active/désactive l'auto-modèle pour ce chat seulement. */
+  toggleAutoModelOff(id: string) {
+    const s = this.map[id];
+    if (s) { s.autoModelOff = !s.autoModelOff; this.touch(); }
+  }
+  /** Active/désactive l'auto-effort pour ce chat seulement. */
+  toggleAutoEffortOff(id: string) {
+    const s = this.map[id];
+    if (s) { s.autoEffortOff = !s.autoEffortOff; this.touch(); }
+  }
+  /** Affiche une bulle transitoire (~1,8 s) sur un contrôle après un cycle clavier. */
+  private flash(s: SessionState, key: "permFlash" | "modelFlash" | "effortFlash", label: string) {
+    s[key] = label;
+    this.touch();
+    window.setTimeout(() => {
+      if (s[key] === label) s[key] = "";
+    }, 1800);
+  }
+
+  /** Cycle le mode de permission (Ctrl+Tab). */
+  cyclePermMode(id: string) {
+    const s = this.map[id];
+    if (!s) return;
+    const i = PERM_MODES.findIndex((m) => m.v === (s.permMode ?? "bypassPermissions"));
+    const next = PERM_MODES[(i + 1) % PERM_MODES.length];
+    s.permMode = next.v;
+    this.flash(s, "permFlash", next.l);
+  }
+
+  /** Cycle le modèle parmi les modèles disponibles (Ctrl+M). */
+  cycleModel(id: string) {
+    const s = this.map[id];
+    if (!s) return;
+    const avail = MODELS.filter((m) => !settings.unavailableModels.includes(m.v));
+    if (!avail.length) return;
+    const i = avail.findIndex((m) => m.v === s.model);
+    const next = avail[(i + 1) % avail.length];
+    s.model = next.v;
+    this.flash(s, "modelFlash", next.l);
+  }
+
+  /** Cycle l'effort parmi ceux valides pour le modèle courant (Ctrl+E). */
+  cycleEffort(id: string) {
+    const s = this.map[id];
+    if (!s) return;
+    const list = effortsFor(s.model);
+    if (!list.length) {
+      this.flash(s, "effortFlash", "Non réglable");
+      return;
+    }
+    const i = list.findIndex((e) => e.v === s.effort);
+    const next = list[(i + 1) % list.length];
+    s.effort = next.v;
+    this.flash(s, "effortFlash", next.l);
+  }
+
   async send(
     id: string,
     text: string,
@@ -285,12 +423,41 @@ class SessionsStore {
     s.lastActivity = Date.now();
     this.touch();
     try {
+      // Mode auto (global ET non désactivé pour ce chat) : choisit effort/modèle avant l'envoi.
+      const autoEff = settings.autoEffort && !s.autoEffortOff;
+      const autoMod = settings.autoModel && !s.autoModelOff;
+      if (autoEff || autoMod) {
+        if (autoEff && !this.effortLevels.length) {
+          try { this.effortLevels = await ipc.effortLevels(); } catch { /* ignore */ }
+        }
+        // Modèles candidats = liste autorisée (réglages) ∩ modèles disponibles.
+        const avail = settings.autoModels.filter((m) => !settings.unavailableModels.includes(m));
+        // Efforts candidats = liste autorisée ∩ niveaux réellement détectés (si connus).
+        const effs = this.effortLevels.length
+          ? settings.autoEfforts.filter((e) => this.effortLevels.includes(e))
+          : settings.autoEfforts;
+        try {
+          const pick = await ipc.autoPick(text, autoMod ? avail : [], autoEff ? effs : []);
+          if (autoMod && pick.model) {
+            s.model = pick.model;
+            this.flash(s, "modelFlash", "auto: " + pick.model);
+          }
+          if (autoEff && pick.effort) {
+            s.effort = pick.effort;
+            this.flash(s, "effortFlash", "auto: " + pick.effort);
+          }
+        } catch { /* ignore : garde le réglage courant */ }
+      }
+      // Permissions : refusés = outils décochés + règles refusées ; autorisés = règles avancées.
+      const deny = [...s.disabledTools, ...(s.denyRules ? [s.denyRules] : [])].join(",");
       await ipc.sessionSend(
         id,
         text,
         s.model,
         s.effort,
         images.map((i) => ({ media_type: i.media_type, data: i.data })),
+        settings.hermesMode,
+        { mode: s.permMode, allowed: s.allowRules || null, disallowed: deny || null },
       );
     } catch (err) {
       s.error = String(err);
@@ -349,6 +516,18 @@ class SessionsStore {
     this.touch();
   }
 
+  /** Mode Hermes : sur échec, demande au backend de réfléchir et d'en tirer un skill. */
+  private maybeLearn(s: SessionState, errorText: string) {
+    if (!settings.hermesMode) return;
+    const rev = [...s.messages].reverse();
+    const request = rev.find((m) => m.role === "user")?.text ?? "";
+    const asst = rev.find((m) => m.role === "assistant");
+    const tools = asst?.toolCalls.map((t) => `${t.name}: ${t.input}`).join(" ; ") ?? "";
+    const summary = `${asst?.text ?? ""}\n${tools}`.trim().slice(0, 2000);
+    // Best-effort, asynchrone, ne bloque pas l'UI.
+    ipc.reflectAndLearn(null, request.slice(0, 2000), summary, errorText.slice(0, 1000)).catch(() => {});
+  }
+
   private lastAssistant(s: SessionState): Msg {
     const last = s.messages[s.messages.length - 1];
     if (last && last.role === "assistant") return last;
@@ -366,6 +545,7 @@ class SessionsStore {
         s.error = null;
         break;
       case "init":
+        if (e.tools?.length) this.tools = e.tools;
         if (e.slash_commands.length > 0) {
           // Fusionne : garde les descriptions déjà connues, ajoute les noms manquants.
           const have = new Set(this.slashCommands.map((c) => c.name));
@@ -423,21 +603,28 @@ class SessionsStore {
         usage.refresh();
         // Chat fini pendant que la fenêtre n'a pas le focus → clignote la barre des tâches.
         if (typeof document !== "undefined" && !document.hasFocus()) ipc.requestAttention();
+        // Mode Hermes : tour soldé par une erreur → apprentissage auto.
+        if (e.is_error) this.maybeLearn(s, "Le tour s'est terminé en erreur (is_error).");
         this.touch();
         break;
-      case "error":
+      case "error": {
         s.error = e.message;
         s.streaming = false;
         // Modèle indisponible → on le retire des listes et on bascule sur un modèle dispo.
-        if (s.model && /selected model|may not exist|access to it|model.*not.*available/i.test(e.message)) {
+        const modelIssue = /selected model|may not exist|access to it|model.*not.*available/i.test(e.message);
+        if (s.model && modelIssue) {
           settings.markModelUnavailable(s.model);
           const fallback = ["opus", "sonnet", "haiku", "fable"].find(
             (m) => m !== s.model && !settings.unavailableModels.includes(m),
           );
           s.model = fallback ?? null;
+        } else {
+          // Mode Hermes : erreur réelle (hors souci de modèle) → apprentissage auto.
+          this.maybeLearn(s, e.message);
         }
         this.touch();
         break;
+      }
       case "exited":
         s.streaming = false;
         s.turnStart = null;

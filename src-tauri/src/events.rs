@@ -8,8 +8,8 @@ use serde::Serialize;
 pub enum SessionEvent {
     /// Le process de session est prêt (init reçu) + commandes slash disponibles.
     Started,
-    /// Init : liste des commandes slash exposées par Claude Code (dynamique).
-    Init { slash_commands: Vec<String> },
+    /// Init : commandes slash + outils disponibles exposés par Claude Code (dynamiques).
+    Init { slash_commands: Vec<String>, tools: Vec<String> },
     /// Début d'un nouveau message assistant (nouveau tour, nouvelle bulle).
     AssistantStart,
     /// Fragment de texte de la réponse de l'assistant (streaming).
@@ -31,6 +31,9 @@ pub enum SessionEvent {
         /// Taille de la fenêtre de contexte du modèle, rapportée par Claude Code
         /// (`modelUsage.<model>.contextWindow`). Dynamique : 200k, 1M… ; 0 si inconnue.
         context_window: u64,
+        /// Le tour s'est-il soldé par une erreur (`result.is_error`) ? Sert au mode Hermes
+        /// (apprentissage auto sur échec).
+        is_error: bool,
     },
     /// Erreur (spawn, parse, auth…).
     Error { message: String },

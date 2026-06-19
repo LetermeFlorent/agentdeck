@@ -32,8 +32,11 @@
   .cmd-pop {
     position: absolute;
     left: 7px;
-    right: 7px;
     bottom: calc(100% + 4px);
+    /* S'ajuste à la largeur du contenu (nom + description), borné au champ. */
+    width: max-content;
+    min-width: 160px;
+    max-width: calc(100% - 14px);
     max-height: 240px;
     overflow-y: auto;
     overscroll-behavior: contain;

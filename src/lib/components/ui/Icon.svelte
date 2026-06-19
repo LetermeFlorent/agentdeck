@@ -81,6 +81,21 @@
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <circle cx="8.5" cy="9" r="1.6" />
     <path d="M21 16l-5-5L5 20" />
+  {:else if name === "cpu"}
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+    <rect x="9.5" y="9.5" width="5" height="5" rx="1" />
+    <path d="M9 2.5v3.5M15 2.5v3.5M9 18v3.5M15 18v3.5M2.5 9h3.5M2.5 15h3.5M18 9h3.5M18 15h3.5" />
+  {:else if name === "gauge"}
+    <path d="M4.5 18a8 8 0 1 1 15 0" />
+    <path d="M12 13.5l4.5-3.5" />
+    <circle cx="12" cy="13.8" r="1.3" fill="currentColor" stroke="none" />
+  {:else if name === "trash"}
+    <path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M10 11v6M14 11v6" />
+  {:else if name === "book"}
+    <path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2V5Z" />
+    <path d="M6 19h13" />
+  {:else if name === "plug"}
+    <path d="M9 2v6M15 2v6M7 8h10v3a5 5 0 0 1-10 0V8ZM12 16v6" />
   {:else if name === "grip"}
     <g fill="currentColor" stroke="none">
       <circle cx="9" cy="6" r="1.4" />

@@ -108,12 +108,35 @@
     // Clic sur l'icône de la barre des tâches → fenêtre au 1er plan → on stoppe le clignotement.
     window.addEventListener("focus", () => ipc.clearAttention());
     // F11 : bascule plein écran (la déco OS est désactivée, donc on le gère nous-mêmes).
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "F11") {
-        e.preventDefault();
-        ipc.winToggleFullscreen();
-      }
-    });
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "F11") {
+          e.preventDefault();
+          ipc.winToggleFullscreen();
+        }
+        // Raccourcis de cycle sur le chat focus (bulle près du contrôle concerné).
+        // Fallback : si aucun chat focus, on cible le 1er chat du layout courant.
+        let sid = sessions.focusedSid;
+        if (!sessions.map[sid]) {
+          const firstSid = (n: any): string => (n?.kind === "leaf" ? n.sid : n ? firstSid(n.a) : "");
+          sid = firstSid(layout.root);
+        }
+        if (!e.ctrlKey || e.altKey || !sessions.map[sid]) return;
+        const k = e.key.toLowerCase();
+        if (e.key === "Tab") {
+          e.preventDefault();
+          sessions.cyclePermMode(sid); // Ctrl+Tab → mode de permission
+        } else if (k === "m") {
+          e.preventDefault();
+          sessions.cycleModel(sid); // Ctrl+M → modèle
+        } else if (k === "e") {
+          e.preventDefault();
+          sessions.cycleEffort(sid); // Ctrl+E → effort
+        }
+      },
+      true,
+    );
   });
 
   async function installClaude() {

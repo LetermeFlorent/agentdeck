@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
+  import { settings } from "$lib/stores/settings.svelte";
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import { priceOf, fmtTok } from "./chat-config";
@@ -93,6 +94,28 @@
     </span>
   {/if}
   <div class="actions">
+    {#if settings.autoModel}
+      <button
+        class="icon-btn"
+        class:on={!session?.autoModelOff}
+        class:off={session?.autoModelOff}
+        use:tooltip={session?.autoModelOff ? "Auto-modèle désactivé pour ce chat — cliquer pour réactiver" : "Auto-modèle actif — cliquer pour désactiver sur ce chat"}
+        onclick={() => sessions.toggleAutoModelOff(sid)}
+      >
+        <Icon name="cpu" size={14} />
+      </button>
+    {/if}
+    {#if settings.autoEffort}
+      <button
+        class="icon-btn"
+        class:on={!session?.autoEffortOff}
+        class:off={session?.autoEffortOff}
+        use:tooltip={session?.autoEffortOff ? "Auto-effort désactivé pour ce chat — cliquer pour réactiver" : "Auto-effort actif — cliquer pour désactiver sur ce chat"}
+        onclick={() => sessions.toggleAutoEffortOff(sid)}
+      >
+        <Icon name="gauge" size={14} />
+      </button>
+    {/if}
     {#if session?.streaming}
       <button class="icon-btn" use:tooltip={"Arrêter"} onclick={() => sessions.stop(sid)}>
         <Icon name="stop" size={15} />
@@ -154,6 +177,21 @@
   .icon-btn.on {
     color: var(--accent);
     background: var(--accent-weak);
+  }
+  /* Auto désactivé pour ce chat : grisé + barré en diagonale. */
+  .icon-btn.off {
+    color: var(--text-faint);
+    position: relative;
+  }
+  .icon-btn.off::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    top: 50%;
+    height: 1.5px;
+    background: var(--danger);
+    transform: rotate(-45deg);
   }
   .close:hover {
     color: var(--danger);

@@ -16,6 +16,10 @@ pub struct SessionProc {
     pub stdin: ChildStdin,
     pub model: Option<String>,
     pub effort: Option<String>,
+    /// Permissions actives du process (pour décider d'un respawn si elles changent).
+    pub perm_mode: Option<String>,
+    pub allowed: Option<String>,
+    pub disallowed: Option<String>,
 }
 
 pub type SharedProc = Arc<TokioMutex<Option<SessionProc>>>;

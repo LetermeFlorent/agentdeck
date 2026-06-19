@@ -73,34 +73,6 @@ fn collect_meta(dir: &std::path::Path, depth: usize, map: &mut HashMap<String, (
     }
 }
 
-/// Métadonnées des commandes built-in du CLI (non exposées par le protocole stream-json).
-fn builtin_meta(name: &str) -> (&'static str, &'static str) {
-    match name {
-        "clear" => ("Effacer l'historique de la conversation", ""),
-        "compact" => ("Résumer et compacter le contexte", "[instructions]"),
-        "config" => ("Ouvrir les réglages de Claude Code", ""),
-        "context" => ("Afficher l'usage de la fenêtre de contexte", ""),
-        "init" => ("Générer / mettre à jour le CLAUDE.md du projet", ""),
-        "review" => ("Revue de code d'une pull request", "[PR]"),
-        "security-review" => ("Revue de sécurité des changements en cours", ""),
-        "usage" => ("Afficher l'usage et les limites d'abonnement", ""),
-        "usage-credits" => ("Afficher les crédits d'usage restants", ""),
-        "extra-usage" => ("Activer / gérer l'usage supplémentaire payant", ""),
-        "insights" => ("Statistiques d'utilisation", ""),
-        "heapdump" => ("Dump mémoire du process (debug)", ""),
-        "reload-skills" => ("Recharger les skills depuis le disque", ""),
-        "goal" => ("Définir l'objectif de la session", "[objectif]"),
-        "team-onboarding" => ("Onboarding de l'équipe", ""),
-        "batch" => ("Lancer plusieurs tâches en lot", ""),
-        "fewer-permission-prompts" => ("Réduire les demandes de permission", ""),
-        "run-skill-generator" => ("Générer un nouveau skill", ""),
-        "model" => ("Changer de modèle", "[modèle]"),
-        "agents" => ("Gérer les sous-agents", ""),
-        "mcp" => ("Gérer les serveurs MCP", ""),
-        _ => ("", ""),
-    }
-}
-
 /// Récupère la liste des commandes slash en lisant l'`init` (déclencheur minimal → coût nul),
 /// puis enrichit chaque nom avec sa description + ses arguments.
 #[tauri::command]
@@ -175,15 +147,16 @@ pub async fn slash_commands() -> Vec<SlashCmd> {
         .await
         .unwrap_or_default();
     let _ = child.start_kill();
+
+    // On ne liste QUE les commandes exposées par l'init : ce sont les seules réellement
+    // exécutables (built-in + skills/plugins activés). Énumérer les fichiers disque non
+    // activés afficherait des commandes mortes (« Unknown command »). Les descriptions
+    // viennent du frontmatter sur disque s'il existe, sinon vide (built-in sans fichier).
     names
         .into_iter()
         .map(|name| {
-            if let Some((d, a)) = meta.get(&name) {
-                SlashCmd { name, description: d.clone(), args: a.clone() }
-            } else {
-                let (d, a) = builtin_meta(&name);
-                SlashCmd { name, description: d.to_string(), args: a.to_string() }
-            }
+            let (description, args) = meta.get(&name).cloned().unwrap_or_default();
+            SlashCmd { name, description, args }
         })
         .collect()
 }

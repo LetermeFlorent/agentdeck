@@ -4,6 +4,7 @@
   import Icon from "../ui/Icon.svelte";
   import Dropdown from "../ui/Dropdown.svelte";
   import SlashPopup from "./SlashPopup.svelte";
+  import PermissionsPopup from "./PermissionsPopup.svelte";
   import ContextGauge from "./ContextGauge.svelte";
   import { MODELS, effortsFor } from "./chat-config";
   import { tooltip } from "$lib/actions/tooltip";
@@ -110,6 +111,24 @@
     return () => window.removeEventListener("pointerdown", onDown, true);
   });
 
+  // Panneau Permissions (par chat).
+  let showPerms = $state(false);
+  const permActive = $derived(
+    !!session &&
+      ((session.permMode ?? "bypassPermissions") !== "bypassPermissions" ||
+        (session.disabledTools?.length ?? 0) > 0 ||
+        !!session.allowRules ||
+        !!session.denyRules),
+  );
+  $effect(() => {
+    if (!showPerms) return;
+    const onDown = (e: PointerEvent) => {
+      if (composerEl && !composerEl.contains(e.target as Node)) showPerms = false;
+    };
+    window.addEventListener("pointerdown", onDown, true);
+    return () => window.removeEventListener("pointerdown", onDown, true);
+  });
+
   // Auto-resize du champ : grandit jusqu'à 5 lignes (~78px) puis devient scrollable.
   // Réactif sur `draft` → gère la saisie ET le reset après envoi (draft = "").
   $effect(() => {
@@ -155,9 +174,12 @@
   }
 </script>
 
-<div class="composer" bind:this={composerEl}>
+<div class="composer" bind:this={composerEl} onfocusin={() => sessions.setFocused(sid)}>
   {#if showCmds}
     <SlashPopup matches={cmdMatches} sel={cmdSel} onpick={pickCmd} />
+  {/if}
+  {#if showPerms}
+    <PermissionsPopup {sid} />
   {/if}
   {#if images.length}
     <div class="thumbs">
@@ -188,6 +210,18 @@
       use:tooltip={"Joindre une image (ou coller depuis le presse-papiers)"}
       onclick={pickFiles}
     ><Icon name="image" size={13} /></button>
+    <span class="perm-wrap">
+      <button
+        type="button"
+        class="cmd-btn"
+        class:on={permActive}
+        use:tooltip={"Permissions de l'agent (mode + outils) · Ctrl+Tab pour changer de mode"}
+        onclick={() => (showPerms = !showPerms)}
+      ><Icon name="lock" size={13} /></button>
+      {#if session?.permFlash}
+        <span class="perm-flash" transition:fly={{ y: 4, duration: 120 }}>{session.permFlash}</span>
+      {/if}
+    </span>
     <input
       bind:this={fileInput}
       type="file"
@@ -199,20 +233,30 @@
         e.currentTarget.value = "";
       }}
     />
-    <Dropdown
-      label="Modèle"
-      options={models}
-      value={session?.model ?? ""}
-      onchange={(v) => sessions.setModel(sid, v)}
-    />
-    {#if efforts.length}
+    <span class="perm-wrap">
       <Dropdown
-        label="Effort"
-        options={efforts}
-        value={session?.effort ?? ""}
-        btnClass={`eff-${session?.effort ?? "medium"}`}
-        onchange={(v) => sessions.setEffort(sid, v)}
+        label="Modèle"
+        options={models}
+        value={session?.model ?? ""}
+        onchange={(v) => sessions.setModel(sid, v)}
       />
+      {#if session?.modelFlash}
+        <span class="perm-flash" transition:fly={{ y: 4, duration: 120 }}>{session.modelFlash}</span>
+      {/if}
+    </span>
+    {#if efforts.length}
+      <span class="perm-wrap">
+        <Dropdown
+          label="Effort"
+          options={efforts}
+          value={session?.effort ?? ""}
+          btnClass={`eff-${session?.effort ?? "medium"}`}
+          onchange={(v) => sessions.setEffort(sid, v)}
+        />
+        {#if session?.effortFlash}
+          <span class="perm-flash" transition:fly={{ y: 4, duration: 120 }}>{session.effortFlash}</span>
+        {/if}
+      </span>
     {/if}
   </div>
   <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
@@ -225,7 +269,7 @@
         cmdDismissed = false;
         sessions.touchActivity(sid);
       }}
-      onfocus={() => sessions.touchActivity(sid)}
+      onfocus={() => { sessions.touchActivity(sid); sessions.setFocused(sid); }}
       onpaste={onPaste}
       rows="1"
     ></textarea>
@@ -327,6 +371,26 @@
     color: var(--accent);
     border-color: var(--accent);
     background: var(--accent-weak);
+  }
+  .perm-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+  .perm-flash {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+    white-space: nowrap;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: #fff;
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 45%, transparent);
+    z-index: 40;
+    pointer-events: none;
   }
   .field {
     flex: 1;

@@ -12,7 +12,19 @@ use super::claude_stream::{handle_line, ToolAcc};
 use crate::events::SessionEvent;
 use crate::session::SessionProc;
 
+/// Directive « mode Hermes » injectée dans le system prompt quand l'auto-apprentissage est actif :
+/// l'agent consulte ses skills avant d'agir et capitalise ses erreurs en skills réutilisables.
+const HERMES_DIRECTIVE: &str = "Tu es un agent qui s'améliore en continu (façon Hermes). \
+Avant de traiter une tâche, examine tes skills disponibles et utilise ceux qui s'appliquent. \
+Quand tu fais une erreur, rencontres un échec, ou découvres une technique réutilisable, \
+capitalise-la en créant ou en affinant un skill (un dossier avec un SKILL.md : frontmatter \
+`name` + `description`, puis les instructions) pour ne pas répéter l'erreur. \
+Vérifie d'abord s'il existe déjà un skill proche → affine-le plutôt que d'en dupliquer un. \
+Place-le en global (~/.claude/skills/<nom>/SKILL.md) s'il est généralement utile, \
+sinon dans le projet (.claude/skills/<nom>/SKILL.md) s'il est spécifique à ce dépôt.";
+
 /// Lance le process persistant et démarre la lecture du stdout.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn spawn(
     app: &tauri::AppHandle,
     id: &str,
@@ -21,6 +33,10 @@ pub(super) async fn spawn(
     effort: &Option<String>,
     token: &Option<String>,
     resume: bool,
+    hermes: bool,
+    perm_mode: &Option<String>,
+    allowed: &Option<String>,
+    disallowed: &Option<String>,
 ) -> Result<SessionProc, String> {
     let mut cmd = Command::new(claude_bin());
     cmd.arg("-p")
@@ -29,9 +45,27 @@ pub(super) async fn spawn(
         .arg("--output-format")
         .arg("stream-json")
         .arg("--verbose")
-        .arg("--include-partial-messages")
-        .arg("--permission-mode")
-        .arg("bypassPermissions");
+        .arg("--include-partial-messages");
+
+    // Mode de permission (défaut : bypassPermissions = comportement historique).
+    let mode = perm_mode.as_deref().filter(|m| !m.is_empty()).unwrap_or("bypassPermissions");
+    cmd.arg("--permission-mode").arg(mode);
+    // Règles d'outils (listes séparées par virgules, ex. "Bash(git *),Edit").
+    if let Some(a) = allowed {
+        if !a.is_empty() {
+            cmd.arg("--allowedTools").arg(a);
+        }
+    }
+    if let Some(d) = disallowed {
+        if !d.is_empty() {
+            cmd.arg("--disallowedTools").arg(d);
+        }
+    }
+
+    // Mode Hermes : injecte la directive d'auto-apprentissage dans le system prompt.
+    if hermes {
+        cmd.arg("--append-system-prompt").arg(HERMES_DIRECTIVE);
+    }
 
     // Persistance de la conversation : on (ré)utilise l'UUID agentdeck comme session Claude.
     // 1ʳᵉ fois → on crée la session ; ensuite → on la reprend (mémoire conservée).
@@ -127,5 +161,8 @@ pub(super) async fn spawn(
         stdin,
         model: model.clone(),
         effort: effort.clone(),
+        perm_mode: perm_mode.clone(),
+        allowed: allowed.clone(),
+        disallowed: disallowed.clone(),
     })
 }
