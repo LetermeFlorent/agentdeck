@@ -16,6 +16,7 @@ interface Persisted {
   autoModels: string[];
   autoEfforts: string[];
   historyLimit: number;
+  defaultCwd: string;
 }
 
 class SettingsStore {
@@ -45,6 +46,8 @@ class SettingsStore {
   autoEfforts = $state<string[]>(["low", "medium", "high", "xhigh", "max"]);
   /** Nombre de conversations affichées dans l'historique (défaut 30). */
   historyLimit = $state(30);
+  /** Dossier de travail par défaut des nouveaux chats (vide = dossier personnel). */
+  defaultCwd = $state("");
 
   load() {
     try {
@@ -64,6 +67,7 @@ class SettingsStore {
       this.autoModels = p.autoModels ?? ["opus", "sonnet", "haiku"];
       this.autoEfforts = p.autoEfforts ?? ["low", "medium", "high", "xhigh", "max"];
       this.historyLimit = p.historyLimit ?? 30;
+      this.defaultCwd = p.defaultCwd ?? "";
     } catch {
       /* ignore */
     }
@@ -84,6 +88,7 @@ class SettingsStore {
       autoModels: this.autoModels,
       autoEfforts: this.autoEfforts,
       historyLimit: this.historyLimit,
+      defaultCwd: this.defaultCwd,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(p));
@@ -137,6 +142,10 @@ class SettingsStore {
     this.autoModels = this.autoModels.includes(model)
       ? this.autoModels.filter((m) => m !== model)
       : [...this.autoModels, model];
+    this.save();
+  }
+  setDefaultCwd(v: string) {
+    this.defaultCwd = v || "";
     this.save();
   }
   setHistoryLimit(v: number) {

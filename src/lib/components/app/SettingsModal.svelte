@@ -6,6 +6,7 @@
   import Icon from "../ui/Icon.svelte";
   import SkillsView from "./SkillsView.svelte";
   import McpView from "./McpView.svelte";
+  import CwdPicker from "../chat/CwdPicker.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import { MODELS, effortsFor, PERM_MODES } from "../chat/chat-config";
   import * as ipc from "$lib/ipc";
@@ -26,6 +27,7 @@
 
   let { onclose }: { onclose: () => void } = $props();
 
+  let showCwd = $state(false);
   // Vue active du modal : réglages | skills | serveurs MCP.
   let view = $state<"settings" | "skills" | "mcp">("settings");
   const titles = { settings: "Paramètres", skills: "Skills", mcp: "Serveurs MCP" };
@@ -266,6 +268,14 @@
       </div>
     </div>
 
+    <button class="row check" onclick={() => (showCwd = true)}>
+      <div class="lbl">
+        <span>Dossier de travail par défaut</span>
+        <span class="sub">{settings.defaultCwd || "Dossier personnel"}</span>
+      </div>
+      <span class="na">Changer</span>
+    </button>
+
     <div class="row">
       <div class="lbl">
         <span>Historique</span>
@@ -296,6 +306,14 @@
     {/if}
   </div>
 </div>
+
+{#if showCwd}
+  <CwdPicker
+    initial={settings.defaultCwd}
+    onpick={(p) => settings.setDefaultCwd(p)}
+    onclose={() => (showCwd = false)}
+  />
+{/if}
 
 <style>
   .overlay {

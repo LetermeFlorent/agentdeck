@@ -98,6 +98,15 @@ impl SessionManager {
         Some((m.proc.clone(), m.cwd.clone()))
     }
 
+    /// Change le dossier de travail d'une session et renvoie son process (à tuer pour
+    /// qu'il soit relancé dans le nouveau dossier au prochain envoi).
+    pub fn set_cwd(&self, id: &str, cwd: Option<String>) -> Option<SharedProc> {
+        let mut map = self.sessions.lock().unwrap();
+        let m = map.get_mut(id)?;
+        m.cwd = cwd;
+        Some(m.proc.clone())
+    }
+
     pub fn proc_handle(&self, id: &str) -> Option<SharedProc> {
         let map = self.sessions.lock().unwrap();
         map.get(id).map(|m| m.proc.clone())

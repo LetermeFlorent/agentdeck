@@ -11,6 +11,7 @@
     nodeId,
     canMinimize = false,
     collapseSide,
+    siblingCollapsed = false,
     canMove = false,
     onsplit,
     onclose,
@@ -20,6 +21,7 @@
     nodeId: string;
     canMinimize?: boolean;
     collapseSide?: "a" | "b";
+    siblingCollapsed?: boolean;
     canMove?: boolean;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
@@ -67,7 +69,7 @@
       <span class="strip-state" class:work={session?.streaming}></span>
     </div>
   {:else}
-    <PaneHeader {sid} {nodeId} {canMinimize} {collapseSide} {canMove} {onsplit} {onclose} />
+    <PaneHeader {sid} {nodeId} {canMinimize} {collapseSide} {siblingCollapsed} {canMove} {onsplit} {onclose} />
     <MessageLog {sid} />
     <Composer {sid} />
   {/if}

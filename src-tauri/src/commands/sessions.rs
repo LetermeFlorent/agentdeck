@@ -72,6 +72,23 @@ pub fn session_send(
     Ok(())
 }
 
+/// Change le dossier de travail (cwd) d'un chat : le process est relancé dedans au prochain envoi.
+#[tauri::command]
+pub async fn session_set_cwd(
+    mgr: tauri::State<'_, SessionManager>,
+    id: String,
+    cwd: Option<String>,
+) -> Result<(), String> {
+    if let Some(proc) = mgr.set_cwd(&id, cwd) {
+        let mut slot = proc.lock().await;
+        if let Some(p) = slot.take() {
+            let mut c = p.child;
+            let _ = c.start_kill();
+        }
+    }
+    Ok(())
+}
+
 /// Nom d'utilisateur du PC (pour l'accueil « Bonjour … » au démarrage).
 #[tauri::command]
 pub fn os_username() -> String {

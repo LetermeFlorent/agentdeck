@@ -70,6 +70,8 @@ export interface SessionState {
   autoEffortOff: boolean;
   /** Brouillon en cours (non envoyé) — survit au repli/dépli du pane. */
   draft: string;
+  /** Dossier de travail (où est le projet) ; Claude y est lancé (current_dir). */
+  cwd: string;
 }
 
 export interface PersistedSession {
@@ -92,6 +94,7 @@ export interface PersistedSession {
   denyRules?: string;
   autoModelOff?: boolean;
   autoEffortOff?: boolean;
+  cwd?: string;
 }
 
 class SessionsStore {
@@ -101,6 +104,10 @@ class SessionsStore {
   /** Modèle / effort par défaut (Claude Code courant), pour pré-remplir les nouveaux panes. */
   defaultModel = $state<string | null>(null);
   defaultEffort = $state<string | null>(null);
+  /** Dossier personnel (cwd par défaut si non configuré). */
+  homePath = $state("");
+  /** Derniers dossiers de travail utilisés (récents), pour le sélecteur. */
+  cwdRecents = $state<string[]>([]);
   /** Commandes slash exposées par Claude Code (nom + description, récupérées dynamiquement). */
   slashCommands = $state<ipc.SlashCmd[]>([]);
   /** Outils disponibles exposés par Claude Code (init), pour le panneau Permissions. */
@@ -125,6 +132,17 @@ class SessionsStore {
   }
 
   async loadDefaults() {
+    try {
+      this.homePath = await ipc.homeDir();
+    } catch {
+      /* ignore */
+    }
+    try {
+      const cached = JSON.parse(localStorage.getItem("agentdeck.cwd.recents") || "[]");
+      if (Array.isArray(cached)) this.cwdRecents = cached;
+    } catch {
+      /* ignore */
+    }
     try {
       const d = await ipc.claudeDefaults();
       this.defaultModel = d.model || null;
@@ -166,14 +184,20 @@ class SessionsStore {
   get effEffort(): string | null {
     return settings.defaultEffort ?? this.defaultEffort;
   }
+  /** Dossier de travail par défaut = réglage utilisateur, sinon dossier personnel. */
+  get effCwd(): string {
+    return settings.defaultCwd || this.homePath;
+  }
 
   async create(opts: { title?: string; cwd?: string; model?: string } = {}): Promise<string> {
-    const id = await ipc.sessionCreate(opts);
+    const cwd = opts.cwd ?? this.effCwd;
+    const id = await ipc.sessionCreate({ title: opts.title, cwd, model: opts.model });
     this.map[id] = {
       id,
       title: opts.title ?? "Claude",
       model: opts.model ?? this.effModel,
       effort: this.effEffort,
+      cwd,
       messages: [],
       streaming: false,
       error: null,
@@ -250,6 +274,7 @@ class SessionsStore {
       autoModelOff: false,
       autoEffortOff: false,
       draft: "",
+      cwd: cwd || this.effCwd,
     };
     this.focusedSid = id;
     await this.attach(id);
@@ -265,6 +290,7 @@ class SessionsStore {
         id: p.id,
         title: p.title,
         started,
+        cwd: p.cwd ?? this.effCwd,
         model: p.model ?? undefined,
       });
       this.map[p.id] = {
@@ -296,6 +322,7 @@ class SessionsStore {
         autoModelOff: p.autoModelOff ?? false,
         autoEffortOff: p.autoEffortOff ?? false,
         draft: "",
+        cwd: p.cwd ?? this.effCwd,
       };
       await this.attach(p.id);
     }
@@ -324,6 +351,7 @@ class SessionsStore {
       denyRules: s.denyRules,
       autoModelOff: s.autoModelOff,
       autoEffortOff: s.autoEffortOff,
+      cwd: s.cwd,
     }));
   }
 
@@ -396,6 +424,26 @@ class SessionsStore {
   setDenyRules(id: string, v: string) {
     const s = this.map[id];
     if (s) { s.denyRules = v; this.touch(); }
+  }
+
+  /** Change le dossier de travail d'un chat (relance le process dedans au prochain envoi). */
+  async setCwd(id: string, cwd: string) {
+    const s = this.map[id];
+    if (!s || !cwd) return;
+    s.cwd = cwd;
+    // Récents (dédupliqués, max 12).
+    this.cwdRecents = [cwd, ...this.cwdRecents.filter((r) => r !== cwd)].slice(0, 12);
+    try {
+      localStorage.setItem("agentdeck.cwd.recents", JSON.stringify(this.cwdRecents));
+    } catch {
+      /* ignore */
+    }
+    this.touch();
+    try {
+      await ipc.sessionSetCwd(id, cwd);
+    } catch {
+      /* ignore */
+    }
   }
 
   /** Mémorise le chat focus (cible des raccourcis clavier). */

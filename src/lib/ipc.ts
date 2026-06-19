@@ -103,6 +103,17 @@ export const sessionSend = (
     disallowed: perm?.disallowed ?? null,
   });
 
+// ---- Dossier de travail (cwd) : home + navigateur de dossiers ----
+export interface DirList {
+  path: string;
+  parent: string | null;
+  dirs: { name: string; path: string }[];
+}
+export const homeDir = () => invoke<string>("home_dir");
+export const listDirs = (path?: string | null) => invoke<DirList>("list_dirs", { path: path ?? null });
+export const sessionSetCwd = (id: string, cwd: string | null) =>
+  invoke<void>("session_set_cwd", { id, cwd });
+
 // ---- Historique des conversations ----
 export interface SessionHist {
   id: string;

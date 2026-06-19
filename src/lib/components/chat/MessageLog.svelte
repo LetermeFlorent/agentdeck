@@ -120,7 +120,7 @@
     padding: 14px;
     /* Réserve la hauteur du composer (overlay ancré en bas) pour ne pas masquer
        les derniers messages au repos ; sa croissance déborde par-dessus. */
-    padding-bottom: 96px;
+    padding-bottom: 46px;
     display: flex;
     flex-direction: column;
     gap: 12px;

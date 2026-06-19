@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod auto;
 pub mod deps;
+pub mod fs;
 pub mod history;
 pub mod learn;
 pub mod library;

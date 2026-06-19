@@ -11,7 +11,9 @@
     node,
     parentDir,
     side,
-  }: { node: Node; parentDir?: "row" | "column"; side?: "a" | "b" } = $props();
+    siblingCollapsed,
+  }: { node: Node; parentDir?: "row" | "column"; side?: "a" | "b"; siblingCollapsed?: boolean } =
+    $props();
 
   // Un panneau replié (collapsed) rétrécit au max : sa cellule ne prend que l'entête.
   const aMin = $derived(
@@ -57,6 +59,7 @@
       nodeId={node.nodeId}
       canMinimize={parentDir === "row"}
       collapseSide={side}
+      {siblingCollapsed}
       canMove={parentDir !== undefined}
       onsplit={(dir) => layout.split(node.nodeId, dir)}
       onclose={() => layout.close(node.nodeId, node.sid)}
@@ -66,7 +69,7 @@
 {:else}
   <div class="split" style={`flex-direction:${node.dir}`} bind:this={el}>
     <div class="cell" class:min={aMin} style={aMin ? "" : `flex-grow:${bMin ? 1 : node.ratio}`}>
-      <Self node={node.a} parentDir={node.dir} side="a" />
+      <Self node={node.a} parentDir={node.dir} side="a" siblingCollapsed={bMin} />
     </div>
     <div
       class="gutter {node.dir}"
@@ -75,7 +78,7 @@
       onpointerdown={startResize}
     ></div>
     <div class="cell" class:min={bMin} style={bMin ? "" : `flex-grow:${aMin ? 1 : 1 - node.ratio}`}>
-      <Self node={node.b} parentDir={node.dir} side="b" />
+      <Self node={node.b} parentDir={node.dir} side="b" siblingCollapsed={aMin} />
     </div>
   </div>
 {/if}

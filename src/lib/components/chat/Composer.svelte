@@ -327,7 +327,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 36px;
+    height: 32px;
     background: var(--surface-2);
     border-top: 1px solid var(--border);
     box-shadow: 0 -6px 16px color-mix(in srgb, var(--bg) 70%, transparent);
@@ -464,7 +464,9 @@
     /* min-width pour forcer le passage à la ligne (pleine largeur) en pane étroit,
        au lieu de se comprimer à ~0 à côté des boutons → saisie inutilisable. */
     min-width: 140px;
-    padding: 2px 2px 2px 3px;
+    /* Même hauteur que les boutons au repos (24px). */
+    min-height: 24px;
+    padding: 0 2px 0 3px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);

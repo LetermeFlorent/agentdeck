@@ -4,16 +4,22 @@
   import { activity } from "$lib/stores/activity.svelte";
   import Icon from "../ui/Icon.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
+  import CwdPicker from "./CwdPicker.svelte";
   import { tooltip } from "$lib/actions/tooltip";
 
   let showActivity = $state(false);
+  let showCwd = $state(false);
   const actCount = $derived(activity.count(sid));
+  const cwdBase = $derived(
+    (session?.cwd ?? "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "dossier",
+  );
 
   let {
     sid,
     nodeId,
     canMinimize = false,
     collapseSide,
+    siblingCollapsed = false,
     canMove = false,
     onsplit,
     onclose,
@@ -22,6 +28,7 @@
     nodeId: string;
     canMinimize?: boolean;
     collapseSide?: "a" | "b";
+    siblingCollapsed?: boolean;
     canMove?: boolean;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
@@ -88,6 +95,13 @@
       >{session?.title ?? "Claude"}</span>
     {/if}
   </div>
+  <button
+    class="cwd-chip"
+    use:tooltip={`Dossier de travail : ${session?.cwd || "—"} · cliquer pour changer`}
+    onclick={() => (showCwd = !showCwd)}
+  >
+    <Icon name="folder" size={12} /><span class="cwd-name">{cwdBase}</span>
+  </button>
   <div class="actions">
     {#if settings.autoModel}
       <button
@@ -135,7 +149,7 @@
     >
       <Icon name={session?.priv ? "eye-off" : "eye"} size={15} />
     </button>
-    {#if canMinimize}
+    {#if canMinimize && !siblingCollapsed}
       <button class="icon-btn" use:tooltip={"Minimiser sur le côté"} onclick={() => sessions.setCollapsed(sid, true)}>
         <span class="chev close" class:right={collapseSide === "b"}><Icon name="chevron" size={15} /></span>
       </button>
@@ -152,6 +166,13 @@
   </div>
   {#if showActivity}
     <ActivityPanel {sid} onclose={() => (showActivity = false)} />
+  {/if}
+  {#if showCwd}
+    <CwdPicker
+      initial={session?.cwd}
+      onpick={(p) => sessions.setCwd(sid, p)}
+      onclose={() => (showCwd = false)}
+    />
   {/if}
 </header>
 
@@ -177,6 +198,31 @@
     font-family: var(--font-mono);
     font-size: 10.5px;
     font-weight: 700;
+  }
+  /* Chip dossier de travail (cwd) à côté du nom du chat. */
+  .cwd-chip {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 160px;
+    margin-right: 6px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+  }
+  .cwd-chip:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .cwd-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .actions {
     display: flex;
