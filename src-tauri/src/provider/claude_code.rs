@@ -36,37 +36,54 @@ pub(super) fn emit(app: &tauri::AppHandle, id: &str, ev: SessionEvent) {
     let _ = app.emit(&channel(id), ev);
 }
 
-/// Image jointe par l'utilisateur (base64 + type MIME).
+/// Fichier joint par l'utilisateur (base64 + type MIME + nom d'origine). Tous types.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ImageInput {
     pub media_type: String,
     /// base64 brut (sans préfixe `data:…`).
     pub data: String,
+    /// Nom d'origine (sert à garder l'extension pour que Claude sache le type).
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
-/// Écrit les images en fichiers temporaires et renvoie leurs chemins absolus.
-/// Claude Code ignore les blocs image base64 en stream-json → on passe par des
-/// fichiers que le modèle lit avec l'outil Read (vérifié).
+/// Extension à partir du nom d'origine, sinon du type MIME, sinon "bin".
+fn pick_ext(file: &ImageInput) -> String {
+    if let Some(n) = &file.name {
+        if let Some(e) = std::path::Path::new(n).extension().and_then(|e| e.to_str()) {
+            if !e.is_empty() {
+                return e.to_lowercase();
+            }
+        }
+    }
+    match file.media_type.as_str() {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "application/pdf" => "pdf",
+        "text/plain" => "txt",
+        _ => "bin",
+    }
+    .to_string()
+}
+
+/// Écrit les fichiers joints en temporaires et renvoie leurs chemins absolus.
+/// Claude Code ignore les blocs base64 en stream-json → on passe par des fichiers
+/// que le modèle lit avec l'outil Read (vérifié).
 fn write_images(images: &[ImageInput]) -> Vec<String> {
     if images.is_empty() {
         return Vec::new();
     }
-    let dir = std::env::temp_dir().join("agentdeck-img");
+    let dir = std::env::temp_dir().join("agentdeck-files");
     let _ = std::fs::create_dir_all(&dir);
     let mut paths = Vec::new();
-    for img in images {
-        let bytes = match base64::engine::general_purpose::STANDARD.decode(img.data.trim()) {
+    for file in images {
+        let bytes = match base64::engine::general_purpose::STANDARD.decode(file.data.trim()) {
             Ok(b) => b,
             Err(_) => continue,
         };
-        let ext = match img.media_type.as_str() {
-            "image/png" => "png",
-            "image/jpeg" | "image/jpg" => "jpg",
-            "image/gif" => "gif",
-            "image/webp" => "webp",
-            _ => "png",
-        };
-        let p = dir.join(format!("{}.{}", uuid::Uuid::new_v4(), ext));
+        let p = dir.join(format!("{}.{}", uuid::Uuid::new_v4(), pick_ext(file)));
         if std::fs::write(&p, &bytes).is_ok() {
             paths.push(p.display().to_string());
         }
@@ -152,7 +169,7 @@ pub async fn send(
     let mut full_text = text;
     let paths = write_images(&images);
     if !paths.is_empty() {
-        full_text.push_str("\n\n[Images jointes par l'utilisateur — lis-les avec l'outil Read :]");
+        full_text.push_str("\n\n[Fichiers joints par l'utilisateur — lis-les avec l'outil Read :]");
         for path in &paths {
             full_text.push('\n');
             full_text.push_str(path);

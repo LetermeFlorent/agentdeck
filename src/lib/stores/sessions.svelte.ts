@@ -201,6 +201,57 @@ class SessionsStore {
     return id;
   }
 
+  /** Ouvre une conversation de l'historique : enregistre la session (resume) + messages reconstruits. */
+  async openExisting(
+    id: string,
+    title: string,
+    cwd: string,
+    msgs: { role: "user" | "assistant"; text: string }[],
+  ): Promise<string> {
+    if (this.map[id]) {
+      this.focusedSid = id;
+      return id;
+    }
+    try {
+      await ipc.sessionRestore({ id, title, started: true, cwd: cwd || undefined });
+    } catch {
+      /* ignore */
+    }
+    this.map[id] = {
+      id,
+      title: title || "Claude",
+      model: this.effModel,
+      effort: this.effEffort,
+      messages: msgs.map((m) => ({ role: m.role, text: m.text, thinking: "", toolCalls: [] })),
+      streaming: false,
+      error: null,
+      collapsed: false,
+      priv: false,
+      queue: [],
+      turnStart: null,
+      turnTokens: 0,
+      totalTokens: 0,
+      costUsd: 0,
+      contextTokens: 0,
+      contextWindow: 0,
+      lastActivity: Date.now(),
+      zoom: settings.defaultZoom ?? 1,
+      permMode: settings.defaultPermMode ?? "bypassPermissions",
+      disabledTools: [],
+      allowRules: "",
+      denyRules: "",
+      permFlash: "",
+      modelFlash: "",
+      effortFlash: "",
+      autoModelOff: false,
+      autoEffortOff: false,
+    };
+    this.focusedSid = id;
+    await this.attach(id);
+    this.touch();
+    return id;
+  }
+
   /** Restaure des sessions persistées au démarrage (réenregistre côté backend pour --resume). */
   async hydrate(list: PersistedSession[]) {
     for (const p of list) {
@@ -404,7 +455,7 @@ class SessionsStore {
   async send(
     id: string,
     text: string,
-    images: { dataUrl: string; media_type: string; data: string }[] = [],
+    images: { dataUrl: string; media_type: string; data: string; name?: string }[] = [],
   ) {
     const s = this.map[id];
     if (!s) return;
@@ -455,7 +506,7 @@ class SessionsStore {
         text,
         s.model,
         s.effort,
-        images.map((i) => ({ media_type: i.media_type, data: i.data })),
+        images.map((i) => ({ media_type: i.media_type, data: i.data, name: i.name })),
         settings.hermesMode,
         { mode: s.permMode, allowed: s.allowRules || null, disallowed: deny || null },
       );

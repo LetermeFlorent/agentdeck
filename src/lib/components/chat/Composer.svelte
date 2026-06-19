@@ -19,19 +19,22 @@
   const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
   const efforts = $derived(effortsFor(session?.model));
 
-  // --- Images jointes (avant envoi) ---
+  // --- Fichiers joints (avant envoi) : tous types, pas que les images ---
   type Attached = { dataUrl: string; media_type: string; data: string; name: string };
   let images = $state<Attached[]>([]);
   let fileInput = $state<HTMLInputElement>();
+
+  const isImage = (a: Attached) => a.media_type.startsWith("image/");
 
   function fileToImage(file: File): Promise<Attached> {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
       r.onload = () => {
         const url = String(r.result);
-        const m = /^data:([^;]+);base64,(.*)$/.exec(url);
+        const m = /^data:([^;]*);base64,(.*)$/.exec(url);
         if (!m) return reject(new Error("format"));
-        resolve({ dataUrl: url, media_type: m[1], data: m[2], name: file.name });
+        // media_type vide (type inconnu) → octet-stream.
+        resolve({ dataUrl: url, media_type: m[1] || "application/octet-stream", data: m[2], name: file.name });
       };
       r.onerror = () => reject(r.error);
       r.readAsDataURL(file);
@@ -40,7 +43,6 @@
   async function addFiles(files: FileList | File[] | null | undefined) {
     if (!files) return;
     for (const f of Array.from(files)) {
-      if (!f.type.startsWith("image/")) continue;
       try {
         images.push(await fileToImage(f));
       } catch {
@@ -176,7 +178,12 @@
 
 <div class="composer" bind:this={composerEl} onfocusin={() => sessions.setFocused(sid)}>
   {#if showCmds}
-    <SlashPopup matches={cmdMatches} sel={cmdSel} onpick={pickCmd} />
+    <SlashPopup
+      matches={cmdMatches}
+      sel={cmdSel}
+      onpick={pickCmd}
+      onattach={() => { pickFiles(); cmdDismissed = true; }}
+    />
   {/if}
   {#if showPerms}
     <PermissionsPopup {sid} />
@@ -184,12 +191,17 @@
   {#if images.length}
     <div class="thumbs">
       {#each images as img, i (img.dataUrl + i)}
-        <div class="thumb" in:fly={{ y: 4, duration: 130 }}>
-          <img src={img.dataUrl} alt={img.name} />
+        <div class="thumb" class:file={!isImage(img)} in:fly={{ y: 4, duration: 130 }}>
+          {#if isImage(img)}
+            <img src={img.dataUrl} alt={img.name} />
+          {:else}
+            <span class="file-ic"><Icon name="terminal" size={15} /></span>
+            <span class="file-nm" use:tooltip={img.name}>{img.name}</span>
+          {/if}
           <button
             type="button"
             class="thumb-x"
-            use:tooltip={"Retirer l'image"}
+            use:tooltip={"Retirer"}
             onclick={() => removeImage(i)}
           ><Icon name="close" size={11} /></button>
         </div>
@@ -204,12 +216,6 @@
       use:tooltip={"Commandes de Claude (/)"}
       onclick={toggleCmds}
     >/</button>
-    <button
-      type="button"
-      class="cmd-btn"
-      use:tooltip={"Joindre une image (ou coller depuis le presse-papiers)"}
-      onclick={pickFiles}
-    ><Icon name="image" size={13} /></button>
     <span class="perm-wrap">
       <button
         type="button"
@@ -225,7 +231,6 @@
     <input
       bind:this={fileInput}
       type="file"
-      accept="image/*"
       multiple
       hidden
       onchange={(e) => {
@@ -321,6 +326,33 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+  /* Pièce jointe non-image : chip avec icône + nom. */
+  .thumb.file {
+    width: auto;
+    max-width: 140px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 22px 0 7px;
+    background: var(--surface-2);
+  }
+  .file-ic {
+    color: var(--text-muted);
+    display: flex;
+    flex-shrink: 0;
+  }
+  .file-nm {
+    font-size: 10.5px;
+    font-family: var(--font-mono);
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .thumb.file .thumb-x {
+    background: transparent;
   }
   .thumb-x {
     position: absolute;

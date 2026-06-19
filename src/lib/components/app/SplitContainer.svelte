@@ -7,7 +7,11 @@
   import { scale } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
-  let { node, parentDir }: { node: Node; parentDir?: "row" | "column" } = $props();
+  let {
+    node,
+    parentDir,
+    side,
+  }: { node: Node; parentDir?: "row" | "column"; side?: "a" | "b" } = $props();
 
   // Un panneau replié (collapsed) rétrécit au max : sa cellule ne prend que l'entête.
   const aMin = $derived(
@@ -49,6 +53,7 @@
       sid={node.sid}
       nodeId={node.nodeId}
       canMinimize={parentDir === "row"}
+      collapseSide={side}
       canMove={parentDir !== undefined}
       onsplit={(dir) => layout.split(node.nodeId, dir)}
       onclose={() => layout.close(node.nodeId, node.sid)}
@@ -57,8 +62,8 @@
   </div>
 {:else}
   <div class="split" style={`flex-direction:${node.dir}`} bind:this={el}>
-    <div class="cell" class:min={aMin} style={aMin ? "" : `flex-grow:${node.ratio}`}>
-      <Self node={node.a} parentDir={node.dir} />
+    <div class="cell" class:min={aMin} style={aMin ? "" : `flex-grow:${bMin ? 1 : node.ratio}`}>
+      <Self node={node.a} parentDir={node.dir} side="a" />
     </div>
     <div
       class="gutter {node.dir}"
@@ -66,8 +71,8 @@
       aria-orientation={node.dir === "row" ? "vertical" : "horizontal"}
       onpointerdown={startResize}
     ></div>
-    <div class="cell" class:min={bMin} style={bMin ? "" : `flex-grow:${1 - node.ratio}`}>
-      <Self node={node.b} parentDir={node.dir} />
+    <div class="cell" class:min={bMin} style={bMin ? "" : `flex-grow:${aMin ? 1 : 1 - node.ratio}`}>
+      <Self node={node.b} parentDir={node.dir} side="b" />
     </div>
   </div>
 {/if}
@@ -99,7 +104,7 @@
   }
   /* cellule d'un panneau minimisé : bande latérale étroite */
   .cell.min {
-    flex: 0 0 42px;
+    flex: 0 0 30px;
   }
   .gutter {
     flex: 0 0 auto;

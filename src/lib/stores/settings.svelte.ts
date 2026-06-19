@@ -15,6 +15,7 @@ interface Persisted {
   autoModel: boolean;
   autoModels: string[];
   autoEfforts: string[];
+  historyLimit: number;
 }
 
 class SettingsStore {
@@ -42,6 +43,8 @@ class SettingsStore {
   autoModels = $state<string[]>(["opus", "sonnet", "haiku"]);
   /** Efforts parmi lesquels l'auto peut choisir (défaut : tous). */
   autoEfforts = $state<string[]>(["low", "medium", "high", "xhigh", "max"]);
+  /** Nombre de conversations affichées dans l'historique (défaut 30). */
+  historyLimit = $state(30);
 
   load() {
     try {
@@ -60,6 +63,7 @@ class SettingsStore {
       this.autoModel = p.autoModel ?? false;
       this.autoModels = p.autoModels ?? ["opus", "sonnet", "haiku"];
       this.autoEfforts = p.autoEfforts ?? ["low", "medium", "high", "xhigh", "max"];
+      this.historyLimit = p.historyLimit ?? 30;
     } catch {
       /* ignore */
     }
@@ -79,6 +83,7 @@ class SettingsStore {
       autoModel: this.autoModel,
       autoModels: this.autoModels,
       autoEfforts: this.autoEfforts,
+      historyLimit: this.historyLimit,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(p));
@@ -132,6 +137,10 @@ class SettingsStore {
     this.autoModels = this.autoModels.includes(model)
       ? this.autoModels.filter((m) => m !== model)
       : [...this.autoModels, model];
+    this.save();
+  }
+  setHistoryLimit(v: number) {
+    this.historyLimit = Math.min(200, Math.max(1, Math.round(v) || 30));
     this.save();
   }
   /** Coche/décoche un effort de la liste auto. */

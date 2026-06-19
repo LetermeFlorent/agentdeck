@@ -16,6 +16,7 @@ export interface SessionInfo {
 export interface ImageInput {
   media_type: string;
   data: string;
+  name?: string;
 }
 
 export interface Bar {
@@ -97,6 +98,18 @@ export const sessionSend = (
     allowed: perm?.allowed ?? null,
     disallowed: perm?.disallowed ?? null,
   });
+
+// ---- Historique des conversations ----
+export interface SessionHist {
+  id: string;
+  title: string;
+  cwd: string;
+  ts: number;
+}
+export const recentSessions = (limit: number) =>
+  invoke<SessionHist[]>("recent_sessions", { limit });
+export const loadMessages = (id: string) =>
+  invoke<{ role: "user" | "assistant"; text: string }[]>("load_messages", { id });
 
 // ---- Mode Auto : niveaux d'effort dynamiques + choix modèle/effort par Haiku ----
 export const effortLevels = () => invoke<string[]>("effort_levels");

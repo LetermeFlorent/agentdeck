@@ -92,6 +92,17 @@ class TabsStore {
     this.touch();
   }
 
+  /** Ouvre une session existante (historique) dans un nouvel onglet. */
+  openSession(sid: string, name: string) {
+    this.commitActive();
+    const id = newId();
+    this.seq += 1;
+    this.list = [...this.list, { id, name: name || "Conversation", root: null }];
+    this.activeId = id;
+    layout.openSingle(sid);
+    this.touch();
+  }
+
   rename(id: string, name: string) {
     const n = name.trim();
     const t = this.list.find((t) => t.id === id);

@@ -14,6 +14,7 @@
   import WindowControls from "$lib/components/ui/WindowControls.svelte";
   import UsageBars from "$lib/components/ui/UsageBars.svelte";
   import SettingsModal from "$lib/components/app/SettingsModal.svelte";
+  import HistoryPopup from "$lib/components/app/HistoryPopup.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import * as ipc from "$lib/ipc";
@@ -29,6 +30,8 @@
   let installing = $state(false);
   let installErr = $state<string | null>(null);
   let showSettings = $state(false);
+  let showHistory = $state(false);
+  let historyNow = $state(0);
   let username = $state("");
 
   // Renommage d'onglet inline.
@@ -303,6 +306,13 @@
       <div class="spacer" data-tauri-drag-region></div>
       <UsageBars />
       <div class="divider" data-tauri-drag-region></div>
+      <button
+        class="icon-btn"
+        use:tooltip={"Historique des conversations"}
+        onclick={() => { historyNow = Date.now(); showHistory = true; }}
+      >
+        <Icon name="history" size={17} />
+      </button>
       <button class="icon-btn" use:tooltip={"Paramètres"} onclick={() => (showSettings = true)}>
         <Icon name="settings" size={17} />
       </button>
@@ -337,6 +347,9 @@
 
   {#if showSettings}
     <SettingsModal onclose={() => (showSettings = false)} />
+  {/if}
+  {#if showHistory}
+    <HistoryPopup now={historyNow} onclose={() => (showHistory = false)} />
   {/if}
 {/if}
 

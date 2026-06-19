@@ -81,6 +81,10 @@
     <rect x="3" y="4" width="18" height="16" rx="2" />
     <circle cx="8.5" cy="9" r="1.6" />
     <path d="M21 16l-5-5L5 20" />
+  {:else if name === "history"}
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+    <path d="M3 4v4h4" />
+    <path d="M12 8v4l3 2" />
   {:else if name === "cpu"}
     <rect x="6" y="6" width="12" height="12" rx="2" />
     <rect x="9.5" y="9.5" width="5" height="5" rx="1" />

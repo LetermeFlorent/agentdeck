@@ -10,6 +10,7 @@
     sid,
     nodeId,
     canMinimize = false,
+    collapseSide,
     canMove = false,
     onsplit,
     onclose,
@@ -18,6 +19,7 @@
     sid: string;
     nodeId: string;
     canMinimize?: boolean;
+    collapseSide?: "a" | "b";
     canMove?: boolean;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
@@ -51,16 +53,21 @@
   ondrop={dropH}
 >
   {#if collapsed}
-    <div class="strip">
-      <button class="icon-btn" use:tooltip={"Déplier le chat"} onclick={() => sessions.setCollapsed(sid, false)}>
-        <span class="chev open"><Icon name="chevron" size={15} /></span>
-      </button>
+    <div
+      class="strip"
+      role="button"
+      tabindex="0"
+      use:tooltip={`${session?.title ?? "Claude"} — déplier`}
+      onclick={() => sessions.setCollapsed(sid, false)}
+      onkeydown={(e) => e.key === "Enter" && sessions.setCollapsed(sid, false)}
+    >
+      <span class="chev open"><Icon name="chevron" size={14} /></span>
       <span class="status" class:live={session?.streaming}></span>
       <span class="strip-title">{session?.title ?? "Claude"}</span>
-      <span class="strip-state" class:work={session?.streaming} use:tooltip={session?.streaming ? "Claude travaille" : "Inactif"}></span>
+      <span class="strip-state" class:work={session?.streaming}></span>
     </div>
   {:else}
-    <PaneHeader {sid} {nodeId} {canMinimize} {canMove} {onsplit} {onclose} />
+    <PaneHeader {sid} {nodeId} {canMinimize} {collapseSide} {canMove} {onsplit} {onclose} />
     <MessageLog {sid} />
     <Composer {sid} />
   {/if}
@@ -99,6 +106,14 @@
     gap: 8px;
     padding: 6px 0;
     background: var(--surface-2);
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .strip:hover {
+    background: var(--elevated);
+  }
+  .strip:hover .chev.open {
+    color: var(--accent);
   }
   .strip-title {
     writing-mode: vertical-rl;

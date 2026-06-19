@@ -2,14 +2,29 @@
   import type { SlashCmd } from "$lib/ipc";
   import { fly } from "svelte/transition";
 
+  import Icon from "../ui/Icon.svelte";
+
   let {
     matches,
     sel,
     onpick,
-  }: { matches: SlashCmd[]; sel: number; onpick: (c: SlashCmd) => void } = $props();
+    onattach,
+  }: {
+    matches: SlashCmd[];
+    sel: number;
+    onpick: (c: SlashCmd) => void;
+    onattach?: () => void;
+  } = $props();
 </script>
 
 <div class="cmd-pop" in:fly={{ y: 6, duration: 130 }}>
+  {#if onattach}
+    <button type="button" class="cmd-item attach" onmousedown={(e) => { e.preventDefault(); onattach?.(); }}>
+      <span class="cmd-name"><Icon name="image" size={13} /> Joindre un fichier</span>
+      <span class="cmd-desc">tous types · ou colle / glisse</span>
+    </button>
+    <div class="sep"></div>
+  {/if}
   {#each matches as c, i}
     <button
       type="button"
@@ -84,5 +99,16 @@
   .cmd-item:hover,
   .cmd-item.sel {
     background: var(--accent-weak);
+  }
+  .cmd-item.attach .cmd-name {
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 2px;
   }
 </style>

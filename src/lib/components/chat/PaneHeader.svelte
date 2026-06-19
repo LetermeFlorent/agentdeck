@@ -3,12 +3,12 @@
   import { settings } from "$lib/stores/settings.svelte";
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
-  import { priceOf, fmtTok } from "./chat-config";
 
   let {
     sid,
     nodeId,
     canMinimize = false,
+    collapseSide,
     canMove = false,
     onsplit,
     onclose,
@@ -16,13 +16,13 @@
     sid: string;
     nodeId: string;
     canMinimize?: boolean;
+    collapseSide?: "a" | "b";
     canMove?: boolean;
     onsplit: (dir: "row" | "column") => void;
     onclose: () => void;
   } = $props();
 
   const session = $derived(sessions.map[sid]);
-  const price = $derived(priceOf(session?.model));
 
   let editing = $state(false);
   let titleDraft = $state("");
@@ -83,16 +83,6 @@
       >{session?.title ?? "Claude"}</span>
     {/if}
   </div>
-  {#if price}
-    <span class="hdr-price" use:tooltip={"Tarif du modèle, par million de tokens (entrée / sortie)"}>
-      ↑${price[0]} ↓${price[1]}/M
-    </span>
-  {/if}
-  {#if (session?.totalTokens ?? 0) > 0}
-    <span class="hdr-usage" use:tooltip={"Coût et tokens générés par ce chat"}>
-      ${(session?.costUsd ?? 0).toFixed(3)} · {fmtTok(session?.totalTokens ?? 0)}
-    </span>
-  {/if}
   <div class="actions">
     {#if settings.autoModel}
       <button
@@ -137,7 +127,7 @@
     </button>
     {#if canMinimize}
       <button class="icon-btn" use:tooltip={"Minimiser sur le côté"} onclick={() => sessions.setCollapsed(sid, true)}>
-        <span class="chev close"><Icon name="chevron" size={15} /></span>
+        <span class="chev close" class:right={collapseSide === "b"}><Icon name="chevron" size={15} /></span>
       </button>
     {/if}
     <button class="icon-btn" use:tooltip={"Diviser horizontalement (haut / bas)"} onclick={() => onsplit("column")}>
@@ -200,8 +190,12 @@
     display: flex;
     transition: transform var(--transition);
   }
+  /* Flèche minimiser : pointe vers le côté où le chat se replie (gauche=A, droite=B). */
   .chev.close {
     transform: rotate(90deg);
+  }
+  .chev.close.right {
+    transform: rotate(-90deg);
   }
   .title {
     display: flex;
@@ -271,18 +265,5 @@
     outline: none;
     width: 130px;
     max-width: 100%;
-  }
-  .hdr-usage,
-  .hdr-price {
-    flex-shrink: 0;
-    margin-right: 6px;
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-faint);
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-  }
-  .hdr-price {
-    color: var(--text-muted);
   }
 </style>

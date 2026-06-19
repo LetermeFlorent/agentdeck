@@ -265,6 +265,33 @@
         {/each}
       </div>
     </div>
+
+    <div class="row">
+      <div class="lbl">
+        <span>Historique</span>
+        <span class="sub">Nombre de conversations récentes affichées</span>
+      </div>
+      <div class="priv-ctl">
+        {#each [15, 30, 50, 100] as n}
+          <button
+            type="button"
+            class="chip"
+            class:on={settings.historyLimit === n}
+            onclick={() => settings.setHistoryLimit(n)}
+          >{n}</button>
+        {/each}
+        <input
+          class="num"
+          type="number"
+          min="1"
+          max="200"
+          step="1"
+          aria-label="Nombre de conversations"
+          value={settings.historyLimit}
+          oninput={(e) => settings.setHistoryLimit(+e.currentTarget.value)}
+        />
+      </div>
+    </div>
     </div>
     {/if}
   </div>

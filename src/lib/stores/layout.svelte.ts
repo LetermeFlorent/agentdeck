@@ -74,6 +74,11 @@ class LayoutStore {
     this.root = { kind: "leaf", nodeId: nid(), sid };
   }
 
+  /** Ouvre une session existante (déjà enregistrée) comme unique pane d'un onglet. */
+  openSingle(sid: string) {
+    this.root = { kind: "leaf", nodeId: nid(), sid };
+  }
+
   /** Restaure un arbre persité (les sessions correspondantes doivent déjà être hydratées). */
   restore(root: Node | null) {
     if (root) {
