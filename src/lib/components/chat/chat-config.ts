@@ -83,12 +83,12 @@ export function autoPickPrompt(
       .map((m) => {
         const p = priceOf(m.v);
         const price = p ? `entrée $${p[0]}/M tok, sortie $${p[1]}/M tok` : "tarif inconnu";
-        return `  - ${m.l} (id: ${m.v} · ${price})`;
+        return `  - ${m.v}  (${m.l} · ${price})`;
       })
       .join("\n");
     parts.push(
-      "Modèles candidats (numéro de version plus élevé = sorti plus récemment et en général " +
-        "plus performant, mais regarde le prix) :\n" + rows,
+      "Modèles candidats — réponds avec l'id EXACT (1ʳᵉ colonne), pas le nom. Numéro de version " +
+        "plus élevé = sorti plus récemment et en général plus performant, mais regarde le prix :\n" + rows,
     );
   }
   if (efforts.length) {

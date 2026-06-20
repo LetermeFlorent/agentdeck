@@ -125,13 +125,40 @@ pub async fn auto_pick(
         Ok(v) => v,
         Err(_) => return AutoPick::default(),
     };
-    let pick = AutoPick {
-        model: v.get("model").and_then(|x| x.as_str()).unwrap_or("").trim().to_string(),
-        effort: v.get("effort").and_then(|x| x.as_str()).unwrap_or("").trim().to_string(),
-    };
-    // Valide contre les listes fournies (sinon vide → on garde la valeur courante côté UI).
-    AutoPick {
-        model: if models.contains(&pick.model) { pick.model } else { String::new() },
-        effort: if efforts.contains(&pick.effort) { pick.effort } else { String::new() },
+    let raw_model = v.get("model").and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
+    let raw_effort = v.get("effort").and_then(|x| x.as_str()).unwrap_or("").trim().to_string();
+    // Résolution tolérante : le choisisseur peut renvoyer un label ("Haiku 4.5") ou un alias
+    // ("haiku") au lieu de l'ID exact → on rapproche par normalisation alphanumérique.
+    let model = resolve(&raw_model, &models);
+    let effort = resolve(&raw_effort, &efforts);
+    log::info!(
+        "auto_pick: brut model={raw_model:?} effort={raw_effort:?} -> retenu model={model:?} effort={effort:?}"
+    );
+    AutoPick { model, effort }
+}
+
+/// Normalise (minuscules + alphanumériques) pour un rapprochement tolérant.
+fn norm(s: &str) -> String {
+    s.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect()
+}
+
+/// Rapproche `pick` d'une entrée de `list` (exact, sinon par normalisation/inclusion).
+fn resolve(pick: &str, list: &[String]) -> String {
+    if pick.is_empty() {
+        return String::new();
     }
+    if let Some(m) = list.iter().find(|m| m.as_str() == pick) {
+        return m.clone();
+    }
+    let p = norm(pick);
+    if p.is_empty() {
+        return String::new();
+    }
+    list.iter()
+        .find(|m| {
+            let n = norm(m);
+            n == p || n.contains(&p) || p.contains(&n)
+        })
+        .cloned()
+        .unwrap_or_default()
 }
