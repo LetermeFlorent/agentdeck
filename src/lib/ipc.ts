@@ -134,8 +134,8 @@ export const loadMessages = (id: string) =>
 
 // ---- Mode Auto : niveaux d'effort dynamiques + choix modèle/effort par Haiku ----
 export const effortLevels = () => invoke<string[]>("effort_levels");
-export const autoPick = (prompt: string, models: string[], efforts: string[]) =>
-  invoke<{ model: string; effort: string }>("auto_pick", { prompt, models, efforts });
+export const autoPick = (prompt: string, models: string[], efforts: string[], picker?: string) =>
+  invoke<{ model: string; effort: string }>("auto_pick", { prompt, models, efforts, picker: picker ?? null });
 
 // ---- Mode Hermes : réflexion auto sur échec → écrit un skill ----
 export const reflectAndLearn = (

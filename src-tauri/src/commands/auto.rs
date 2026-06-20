@@ -41,7 +41,12 @@ pub struct AutoPick {
 
 /// Choisit modèle + effort pour une demande via un appel Haiku jetable (cheap).
 #[tauri::command]
-pub async fn auto_pick(prompt: String, models: Vec<String>, efforts: Vec<String>) -> AutoPick {
+pub async fn auto_pick(
+    prompt: String,
+    models: Vec<String>,
+    efforts: Vec<String>,
+    picker: Option<String>,
+) -> AutoPick {
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
     // Connexion agentdeck indépendante : il faut notre propre token dans le coffre
@@ -68,7 +73,7 @@ pub async fn auto_pick(prompt: String, models: Vec<String>, efforts: Vec<String>
         .arg("--permission-mode")
         .arg("bypassPermissions")
         .arg("--model")
-        .arg("haiku")
+        .arg(picker.as_deref().filter(|p| !p.is_empty()).unwrap_or("haiku"))
         .env_remove("ANTHROPIC_API_KEY")
         .env_remove("ANTHROPIC_AUTH_TOKEN")
         .stdin(std::process::Stdio::piped())

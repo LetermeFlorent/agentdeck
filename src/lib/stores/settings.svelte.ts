@@ -18,6 +18,7 @@ interface Persisted {
   autoModel: boolean;
   autoModels: string[];
   autoEfforts: string[];
+  autoPickModel: string;
   historyLimit: number;
   defaultCwd: string;
   chatSleepEnabled: boolean;
@@ -49,6 +50,8 @@ class SettingsStore {
   autoModels = $state<string[]>(["opus", "sonnet", "haiku"]);
   /** Efforts parmi lesquels l'auto peut choisir (défaut : tous). */
   autoEfforts = $state<string[]>(["low", "medium", "high", "xhigh", "max"]);
+  /** Modèle qui décide de la config en mode Auto (vide = Haiku par défaut, le moins cher). */
+  autoPickModel = $state("");
   /** Nombre de conversations affichées dans l'historique (défaut 30). */
   historyLimit = $state(30);
   /** Dossier de travail par défaut des nouveaux chats (vide = dossier personnel). */
@@ -75,6 +78,7 @@ class SettingsStore {
       this.autoModel = p.autoModel ?? false;
       this.autoModels = p.autoModels ?? ["opus", "sonnet", "haiku"];
       this.autoEfforts = p.autoEfforts ?? ["low", "medium", "high", "xhigh", "max"];
+      this.autoPickModel = p.autoPickModel ?? "";
       this.historyLimit = p.historyLimit ?? 30;
       this.defaultCwd = p.defaultCwd ?? "";
       this.chatSleepEnabled = p.chatSleepEnabled ?? false;
@@ -102,6 +106,7 @@ class SettingsStore {
       autoModel: this.autoModel,
       autoModels: this.autoModels,
       autoEfforts: this.autoEfforts,
+      autoPickModel: this.autoPickModel,
       historyLimit: this.historyLimit,
       defaultCwd: this.defaultCwd,
       chatSleepEnabled: this.chatSleepEnabled,
@@ -163,6 +168,10 @@ class SettingsStore {
   }
   setDefaultCwd(v: string) {
     this.defaultCwd = v || "";
+    this.save();
+  }
+  setAutoPickModel(v: string) {
+    this.autoPickModel = v || "";
     this.save();
   }
   setHistoryLimit(v: number) {

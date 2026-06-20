@@ -225,13 +225,27 @@
         </div>
       {/if}
 
-      <button class="row check" use:tooltip={"Voir le message envoyé au modèle qui choisit la config"} onclick={() => (showAutoPrompt = true)}>
+      <div class="row">
         <div class="lbl">
-          <span>Prompt de sélection auto</span>
-          <span class="sub">Message envoyé au modèle pour choisir modèle + effort</span>
+          <span>Modèle qui choisit</span>
+          <span class="sub">Décide la config selon ta demande · Haiku par défaut (le moins cher)</span>
         </div>
-        <span class="na">Voir</span>
-      </button>
+        <div class="priv-ctl">
+          <Dropdown
+            label="Haiku (déf.)"
+            options={models}
+            value={settings.autoPickModel}
+            onchange={(v) => settings.setAutoPickModel(v)}
+          />
+          <button
+            class="icon-btn pick-prompt"
+            use:tooltip={"Voir le prompt envoyé à ce modèle"}
+            onclick={() => (showAutoPrompt = true)}
+          >
+            <Icon name="terminal" size={15} />
+          </button>
+        </div>
+      </div>
     {/if}
 
     <button
@@ -630,6 +644,17 @@
   .cbadge.save {
     color: var(--good);
     background: color-mix(in srgb, var(--good) 14%, transparent);
+  }
+  .pick-prompt {
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+  }
+  .pick-prompt:hover {
+    color: var(--accent);
+    border-color: var(--accent);
   }
   .prompt-modal {
     max-width: 560px;
