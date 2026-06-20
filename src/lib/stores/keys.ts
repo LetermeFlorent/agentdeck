@@ -5,4 +5,5 @@ export const STORAGE_KEYS = {
   theme: "agentdeck.theme",
   settings: "agentdeck.settings.v1",
   slash: "agentdeck.slash.v2",
+  onboarded: "agentdeck.onboarded.v1",
 } as const;

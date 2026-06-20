@@ -6,6 +6,7 @@
   import Icon from "../ui/Icon.svelte";
   import SkillsView from "./SkillsView.svelte";
   import McpView from "./McpView.svelte";
+  import { tour } from "$lib/stores/tour.svelte";
 
   async function pickDefaultCwd() {
     const p = await ipc.pickFolder(settings.defaultCwd);
@@ -348,6 +349,14 @@
         />
       </div>
     </div>
+
+    <button class="row check" onclick={() => { tour.start(); onclose(); }}>
+      <div class="lbl">
+        <span>Revoir le tutoriel</span>
+        <span class="sub">Relance la visite guidée des fonctions</span>
+      </div>
+      <span class="na">Lancer</span>
+    </button>
     </div>
     {/if}
   </div>

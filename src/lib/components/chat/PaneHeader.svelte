@@ -178,7 +178,7 @@
     <button class="icon-btn" use:tooltip={"Diviser horizontalement (haut / bas)"} onclick={() => onsplit("column")}>
       <Icon name="split-v" />
     </button>
-    <button class="icon-btn" use:tooltip={"Diviser verticalement (côte à côte)"} onclick={() => onsplit("row")}>
+    <button class="icon-btn" data-tour="split" use:tooltip={"Diviser verticalement (côte à côte)"} onclick={() => onsplit("row")}>
       <Icon name="split-h" />
     </button>
     <button class="icon-btn close" use:tooltip={"Fermer le pane"} onclick={onclose}>

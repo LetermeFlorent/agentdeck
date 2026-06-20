@@ -15,6 +15,8 @@
   import UsageBars from "$lib/components/ui/UsageBars.svelte";
   import SettingsModal from "$lib/components/app/SettingsModal.svelte";
   import HistoryPopup from "$lib/components/app/HistoryPopup.svelte";
+  import Tour from "$lib/components/app/Tour.svelte";
+  import { tour } from "$lib/stores/tour.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import SparkMark from "$lib/components/ui/SparkMark.svelte";
@@ -220,6 +222,7 @@
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     booted = true;
     sessions.startPrivacyWatch(); // veille : passage auto en mode privé après inactivité
+    setTimeout(() => tour.maybeStart(), 500); // tour guidé au 1er lancement (DOM peint)
   }
 
   // Sauvegarde automatique à chaque changement (après le boot, pour ne pas écraser l'état restauré).
@@ -348,23 +351,24 @@
             {/if}
           </div>
         {/each}
-        <button class="tab-add" use:tooltip={"Nouvel onglet"} onclick={() => tabs.create()}>
+        <button class="tab-add" data-tour="tabs" use:tooltip={"Nouvel onglet"} onclick={() => tabs.create()}>
           <Icon name="plus" size={14} />
         </button>
       </div>
       <div class="divider" data-tauri-drag-region></div>
 
       <div class="spacer" data-tauri-drag-region></div>
-      <UsageBars />
+      <span class="usage-wrap" data-tour="usage"><UsageBars /></span>
       <div class="divider" data-tauri-drag-region></div>
       <button
         class="icon-btn"
+        data-tour="history"
         use:tooltip={"Historique des conversations"}
         onclick={() => { historyNow = Date.now(); showHistory = true; }}
       >
         <Icon name="history" size={17} />
       </button>
-      <button class="icon-btn" use:tooltip={"Paramètres"} onclick={() => (showSettings = true)}>
+      <button class="icon-btn" data-tour="settings" use:tooltip={"Paramètres"} onclick={() => (showSettings = true)}>
         <Icon name="settings" size={17} />
       </button>
       <button class="icon-btn" use:tooltip={"Se déconnecter"} onclick={logout}>
@@ -401,6 +405,9 @@
   {/if}
   {#if showHistory}
     <HistoryPopup now={historyNow} onclose={() => (showHistory = false)} />
+  {/if}
+  {#if tour.active}
+    <Tour />
   {/if}
 {/if}
 
@@ -673,6 +680,10 @@
   }
   .spacer {
     flex: 1;
+  }
+  .usage-wrap {
+    display: inline-flex;
+    align-items: center;
   }
   .divider {
     width: 1px;
