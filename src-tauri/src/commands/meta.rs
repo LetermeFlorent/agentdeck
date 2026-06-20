@@ -41,7 +41,9 @@ pub async fn claude_models() -> Vec<serde_json::Value> {
                 continue;
             }
             let name = m.get("display_name").and_then(|x| x.as_str()).unwrap_or(id);
-            out.push(serde_json::json!({ "v": id, "l": name }));
+            // Pas besoin du préfixe "Claude " dans le sélecteur.
+            let label = name.strip_prefix("Claude ").unwrap_or(name);
+            out.push(serde_json::json!({ "v": id, "l": label }));
         }
     }
     out
