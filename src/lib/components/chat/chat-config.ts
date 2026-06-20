@@ -1,11 +1,27 @@
 // Config partagée des chats : modèles, efforts, tarifs, formatage.
 
 export const MODELS = [
-  { v: "opus", l: "Opus" },
-  { v: "sonnet", l: "Sonnet" },
-  { v: "haiku", l: "Haiku" },
-  { v: "fable", l: "Fable" },
+  { v: "opus", l: "Opus (dernier)" },
+  { v: "claude-opus-4-8", l: "Opus 4.8" },
+  { v: "claude-opus-4-7", l: "Opus 4.7" },
+  { v: "claude-opus-4-6", l: "Opus 4.6" },
+  { v: "sonnet", l: "Sonnet (dernier)" },
+  { v: "claude-sonnet-4-6", l: "Sonnet 4.6" },
+  { v: "haiku", l: "Haiku (dernier)" },
+  { v: "claude-haiku-4-5", l: "Haiku 4.5" },
+  { v: "fable", l: "Fable (dernier)" },
+  { v: "claude-fable-5", l: "Fable 5" },
 ];
+
+/** Famille (tier) d'un modèle depuis son alias OU son ID exact (claude-opus-4-6 → "opus"). */
+export function tierOf(model: string | null | undefined): "opus" | "sonnet" | "haiku" | "fable" | null {
+  const m = model ?? "";
+  if (m === "opus" || m.startsWith("claude-opus")) return "opus";
+  if (m === "sonnet" || m.startsWith("claude-sonnet")) return "sonnet";
+  if (m === "haiku" || m.startsWith("claude-haiku")) return "haiku";
+  if (m === "fable" || m.startsWith("claude-fable")) return "fable";
+  return null;
+}
 
 /** Modes de permission du CLI Claude Code (--permission-mode). */
 export const PERM_MODES = [
@@ -25,10 +41,14 @@ const MAX = { v: "max", l: "Max" };
 // Ultracode : exclusif Opus (mappé sur --effort xhigh côté CLI).
 export const ULTRACODE = { v: "ultracode", l: "Ultracode" };
 
-/** Niveaux d'effort valides selon le modèle (xhigh = Opus/Fable seulement ; Haiku = aucun). */
+/** Niveaux d'effort valides selon le modèle.
+ *  xhigh n'existe qu'à partir d'Opus 4.7 (donc PAS sur Opus 4.6) ; Sonnet n'a pas de xhigh ;
+ *  Haiku n'a aucun effort. L'alias "opus" = dernier Opus → supporte xhigh + ultracode. */
 export function effortsFor(model: string | null | undefined): { v: string; l: string }[] {
-  switch (model) {
+  switch (tierOf(model)) {
     case "opus":
+      // Opus 4.6 : pas de xhigh ni ultracode (xhigh ajouté en 4.7).
+      if (model === "claude-opus-4-6") return [LOW, MEDIUM, HIGH, MAX];
       return [LOW, MEDIUM, HIGH, XHIGH, MAX, ULTRACODE];
     case "fable":
       return [LOW, MEDIUM, HIGH, XHIGH, MAX];
@@ -48,7 +68,7 @@ export const PRICES: Record<string, [number, number]> = {
 };
 
 export function priceOf(model: string | null | undefined): [number, number] | null {
-  return PRICES[model ?? "opus"] ?? null;
+  return PRICES[tierOf(model) ?? "opus"] ?? null;
 }
 
 // Commandes slash INTÉGRÉES interactives (TUI) : elles n'ont aucun effet utile en mode
