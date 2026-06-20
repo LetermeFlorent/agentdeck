@@ -59,7 +59,11 @@
 
   function measure() {
     const s = steps[idx];
-    const el = s ? (document.querySelector(s.sel) as HTMLElement | null) : null;
+    let el = s ? (document.querySelector(s.sel) as HTMLElement | null) : null;
+    // Cible sans taille (wrapper) → bascule sur le 1er enfant visible.
+    if (el && (el.offsetWidth === 0 || el.offsetHeight === 0)) {
+      el = (el.querySelector("*") as HTMLElement | null) ?? el;
+    }
     if (!el) {
       rect = null;
     } else {

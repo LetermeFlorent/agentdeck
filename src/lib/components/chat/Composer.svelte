@@ -229,10 +229,11 @@
       use:tooltip={"Commandes de Claude (/)"}
       onclick={toggleCmds}
     >/</button>
-    <span class="perm-wrap" data-tour="perms">
+    <span class="perm-wrap">
       <button
         type="button"
         class="cmd-btn"
+        data-tour="perms"
         class:on={permActive}
         use:tooltip={"Permissions de l'agent (mode + outils) · Ctrl+Tab pour changer de mode"}
         onclick={() => (showPerms = !showPerms)}
@@ -251,9 +252,10 @@
         e.currentTarget.value = "";
       }}
     />
-    <span class="perm-wrap" data-tour="model">
+    <span class="perm-wrap">
       <Dropdown
         label="Modèle"
+        dataTour="model"
         options={models}
         value={session?.model ?? ""}
         onchange={(v) => sessions.setModel(sid, v)}
@@ -263,9 +265,10 @@
       {/if}
     </span>
     {#if efforts.length}
-      <span class="perm-wrap" data-tour="effort">
+      <span class="perm-wrap">
         <Dropdown
           label="Effort"
+          dataTour="effort"
           options={efforts}
           value={session?.effort ?? ""}
           btnClass={`eff-${session?.effort ?? "medium"}`}

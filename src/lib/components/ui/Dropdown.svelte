@@ -10,12 +10,14 @@
     label,
     onchange,
     btnClass = "",
+    dataTour = "",
   }: {
     value: string;
     options: { v: string; l: string }[];
     label: string;
     onchange: (v: string) => void;
     btnClass?: string;
+    dataTour?: string;
   } = $props();
 
   let open = $state(false);
@@ -64,6 +66,7 @@
     class="dd-btn {btnClass}"
     class:open
     class:set={value !== ""}
+    data-tour={dataTour || undefined}
     bind:this={btn}
     use:tooltip={label}
     onclick={toggle}
