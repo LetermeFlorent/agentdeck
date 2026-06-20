@@ -232,9 +232,9 @@
         </div>
         <div class="priv-ctl">
           <Dropdown
-            label="Haiku (déf.)"
+            label="Haiku"
             options={models}
-            value={settings.autoPickModel}
+            value={settings.autoPickModel || modelStore.pickerDefault}
             onchange={(v) => settings.setAutoPickModel(v)}
           />
           <button

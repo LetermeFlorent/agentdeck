@@ -557,7 +557,7 @@ class SessionsStore {
         const effInfos = effs.map((v) => ({ v, l: v }));
         const instruction = autoPickPrompt(text, autoMod ? modelInfos : [], autoEff ? effInfos : []);
         try {
-          const pick = await ipc.autoPick(instruction, autoMod ? avail : [], autoEff ? effs : [], settings.autoPickModel);
+          const pick = await ipc.autoPick(instruction, autoMod ? avail : [], autoEff ? effs : [], settings.autoPickModel || modelStore.pickerDefault);
           if (autoMod && pick.model) {
             s.model = pick.model;
             this.flash(s, "modelFlash", "auto: " + pick.model);
