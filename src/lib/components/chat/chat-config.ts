@@ -1,15 +1,11 @@
 // Config partagée des chats : modèles, efforts, tarifs, formatage.
 
 export const MODELS = [
-  { v: "opus", l: "Opus" },
   { v: "claude-opus-4-8", l: "Opus 4.8" },
   { v: "claude-opus-4-7", l: "Opus 4.7" },
   { v: "claude-opus-4-6", l: "Opus 4.6" },
-  { v: "sonnet", l: "Sonnet" },
   { v: "claude-sonnet-4-6", l: "Sonnet 4.6" },
-  { v: "haiku", l: "Haiku" },
   { v: "claude-haiku-4-5", l: "Haiku 4.5" },
-  { v: "fable", l: "Fable" },
   { v: "claude-fable-5", l: "Fable 5" },
 ];
 
