@@ -50,20 +50,11 @@ pub async fn auto_pick(prompt: String, models: Vec<String>, efforts: Vec<String>
     if token.is_none() {
         return AutoPick::default();
     }
-    let models_s = models.join(", ");
-    let efforts_s = efforts.join(", ");
-    let ask = format!(
-        "Choisis la config optimale pour traiter cette demande d'un utilisateur à un agent de code. \
-Modèles possibles : [{models_s}]. Efforts possibles : [{efforts_s}]. \
-Règle : demande simple / question courte → effort bas + modèle léger ; \
-tâche complexe (code, architecture, debug, raisonnement long) → effort élevé + modèle puissant. \
-Réponds STRICTEMENT en JSON une ligne, sans texte autour : \
-{{\"model\":\"<un des modèles ou vide>\",\"effort\":\"<un des efforts ou vide>\"}}. \
-Demande : {prompt}"
-    );
+    // L'instruction complète (avec prix/récence) est construite côté frontend et passée telle
+    // quelle dans `prompt` — ce qui permet aussi de l'afficher en aperçu dans les réglages.
     let msg = serde_json::json!({
         "type": "user",
-        "message": { "role": "user", "content": [{ "type": "text", "text": ask }] }
+        "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
     })
     .to_string();
 

@@ -7,7 +7,7 @@ import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
 import { activity } from "./activity.svelte";
 import { STORAGE_KEYS } from "./keys";
-import { PERM_MODES, effortsFor } from "$lib/components/chat/chat-config";
+import { PERM_MODES, effortsFor, autoPickPrompt } from "$lib/components/chat/chat-config";
 import { modelStore } from "./models.svelte";
 
 export interface ToolCall {
@@ -552,8 +552,12 @@ class SessionsStore {
         const effs = this.effortLevels.length
           ? settings.autoEfforts.filter((e) => this.effortLevels.includes(e))
           : settings.autoEfforts;
+        // Résout les libellés des modèles candidats (pour prix/récence dans le prompt).
+        const modelInfos = avail.map((v) => modelStore.available.find((m) => m.v === v) ?? { v, l: v });
+        const effInfos = effs.map((v) => ({ v, l: v }));
+        const instruction = autoPickPrompt(text, autoMod ? modelInfos : [], autoEff ? effInfos : []);
         try {
-          const pick = await ipc.autoPick(text, autoMod ? avail : [], autoEff ? effs : []);
+          const pick = await ipc.autoPick(instruction, autoMod ? avail : [], autoEff ? effs : []);
           if (autoMod && pick.model) {
             s.model = pick.model;
             this.flash(s, "modelFlash", "auto: " + pick.model);

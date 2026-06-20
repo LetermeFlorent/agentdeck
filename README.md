@@ -24,6 +24,17 @@ d'autres providers se branchent en implémentant le trait `Provider` côté Rust
     **comptage local** des tokens consommés via l'app, sur fenêtres glissantes (libellé « estimé »).
 - **Thème clair / sombre** façon Claude Code, qui suit le système (toggle système/clair/sombre).
 - **Sessions persistées** : à la réouverture de l'app, on retrouve ses Claudes (reprise via `claude --resume`).
+- **Choix du modèle par chat** : liste récupérée dynamiquement via l'API Models (gratuite) du compte
+  (Opus, Sonnet, Haiku, Fable… versionnés), repli sur une liste de secours si hors-ligne.
+- **Mode Auto** : un appel léger (Haiku) choisit le modèle et/ou l'effort adapté à chaque demande —
+  en tenant compte des **prix** et de la **récence** des modèles pour optimiser le coût sans sacrifier
+  la qualité. Le prompt de sélection est consultable dans les Paramètres.
+- **Veille des chats** : un chat inactif se met en veille (process `claude` arrêté → RAM libérée),
+  réveil au clic ; délai réglable, ou veille manuelle par bouton.
+- **Chargement progressif** (historique, catalogues skills/MCP, listes installées) avec petit loader.
+- **Gate connexion** : au lancement, si pas d'internet → écran dédié + reconnexion auto.
+- **Tour guidé** au premier lancement (rejouable depuis les Paramètres).
+- **Mode Hermes** : l'agent capitalise ses erreurs en skills (global ou projet).
 
 ## Prérequis (utilisation)
 

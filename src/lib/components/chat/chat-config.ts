@@ -67,6 +67,51 @@ export function priceOf(model: string | null | undefined): [number, number] | nu
   return PRICES[tierOf(model) ?? "opus"] ?? null;
 }
 
+/** Construit l'instruction envoyée au modèle-choisisseur (mode Auto). Inclut prix + récence
+ *  pour optimiser le coût tout en visant le meilleur résultat. Réutilisée pour l'aperçu (popup). */
+export function autoPickPrompt(
+  userPrompt: string,
+  models: { v: string; l: string }[],
+  efforts: { v: string; l: string }[],
+): string {
+  const parts: string[] = [
+    "Tu choisis la configuration optimale (modèle et/ou effort) pour traiter la demande d'un " +
+      "utilisateur à un agent de code. Objectif : le MEILLEUR résultat au MOINDRE coût.",
+  ];
+  if (models.length) {
+    const rows = models
+      .map((m) => {
+        const p = priceOf(m.v);
+        const price = p ? `entrée $${p[0]}/M tok, sortie $${p[1]}/M tok` : "tarif inconnu";
+        return `  - ${m.l} (id: ${m.v} · ${price})`;
+      })
+      .join("\n");
+    parts.push(
+      "Modèles candidats (numéro de version plus élevé = sorti plus récemment et en général " +
+        "plus performant, mais regarde le prix) :\n" + rows,
+    );
+  }
+  if (efforts.length) {
+    parts.push("Efforts possibles : " + efforts.map((e) => e.v).join(", ") + ".");
+  }
+  parts.push(
+    "Règle : demande simple / question courte → modèle le moins cher qui suffit" +
+      (efforts.length ? " + effort bas" : "") +
+      " ; tâche complexe (code, archi, debug, raisonnement long) → modèle plus puissant/récent" +
+      (efforts.length ? " + effort élevé" : "") +
+      ". Ne prends un modèle cher que si la tâche le justifie vraiment.",
+  );
+  const shape =
+    models.length && efforts.length
+      ? '{"model":"<un id ou vide>","effort":"<un effort ou vide>"}'
+      : models.length
+        ? '{"model":"<un id ou vide>","effort":""}'
+        : '{"model":"","effort":"<un effort ou vide>"}';
+  parts.push("Réponds STRICTEMENT en JSON sur une ligne, sans texte autour : " + shape + ".");
+  parts.push("Demande : " + userPrompt);
+  return parts.join("\n");
+}
+
 // Commandes slash INTÉGRÉES interactives (TUI) : elles n'ont aucun effet utile en mode
 // headless `claude -p` (le mode qu'agentdeck utilise) → on les masque du popup pour ne pas
 // laisser croire qu'elles marchent. Les commandes custom / skills (deep-research, code-review,

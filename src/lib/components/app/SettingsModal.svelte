@@ -13,7 +13,7 @@
     if (p) settings.setDefaultCwd(p);
   }
   import { tooltip } from "$lib/actions/tooltip";
-  import { effortsFor, PERM_MODES } from "../chat/chat-config";
+  import { effortsFor, PERM_MODES, autoPickPrompt } from "../chat/chat-config";
   import { modelStore } from "$lib/stores/models.svelte";
   import * as ipc from "$lib/ipc";
   import { onMount } from "svelte";
@@ -32,6 +32,18 @@
   });
 
   let { onclose }: { onclose: () => void } = $props();
+
+  // Aperçu du prompt de sélection auto (popup).
+  let showAutoPrompt = $state(false);
+  const autoPreview = $derived(
+    autoPickPrompt(
+      "« ta demande ici »",
+      settings.autoModel
+        ? settings.autoModels.map((v) => modelStore.available.find((m) => m.v === v) ?? { v, l: v })
+        : [],
+      settings.autoEffort ? settings.autoEfforts.map((v) => ({ v, l: v })) : [],
+    ),
+  );
 
   // Vue active du modal : réglages | skills | serveurs MCP.
   let view = $state<"settings" | "skills" | "mcp">("settings");
@@ -212,6 +224,14 @@
           </div>
         </div>
       {/if}
+
+      <button class="row check" use:tooltip={"Voir le message envoyé au modèle qui choisit la config"} onclick={() => (showAutoPrompt = true)}>
+        <div class="lbl">
+          <span>Prompt de sélection auto</span>
+          <span class="sub">Message envoyé au modèle pour choisir modèle + effort</span>
+        </div>
+        <span class="na">Voir</span>
+      </button>
     {/if}
 
     <button
@@ -362,6 +382,32 @@
     {/if}
   </div>
 </div>
+
+{#if showAutoPrompt}
+  <div
+    class="overlay"
+    role="presentation"
+    transition:fade={{ duration: 120 }}
+    onclick={() => (showAutoPrompt = false)}
+  >
+    <div
+      class="modal prompt-modal"
+      role="dialog"
+      aria-label="Prompt de sélection auto"
+      transition:fly={{ y: 12, duration: 200, easing: cubicOut }}
+      onclick={(e) => e.stopPropagation()}
+    >
+      <header class="m-head">
+        <span class="m-title">Prompt de sélection</span>
+        <button class="icon-btn" use:tooltip={"Fermer"} onclick={() => (showAutoPrompt = false)}>
+          <Icon name="close" />
+        </button>
+      </header>
+      <p class="prompt-note">Message réellement envoyé au modèle qui choisit la config (ta demande s'insère à la fin).</p>
+      <pre class="prompt-pre">{autoPreview}</pre>
+    </div>
+  </div>
+{/if}
 
 <style>
   .overlay {
@@ -584,5 +630,28 @@
   .cbadge.save {
     color: var(--good);
     background: color-mix(in srgb, var(--good) 14%, transparent);
+  }
+  .prompt-modal {
+    max-width: 560px;
+  }
+  .prompt-note {
+    margin: 6px 0 8px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+  .prompt-pre {
+    margin: 0;
+    max-height: 60vh;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--text);
   }
 </style>
