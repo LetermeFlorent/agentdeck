@@ -557,8 +557,18 @@ class SessionsStore {
         if (autoEff && !this.effortLevels.length) {
           try { this.effortLevels = await ipc.effortLevels(); } catch { /* ignore */ }
         }
-        // Modèles candidats = liste autorisée (réglages) ∩ modèles disponibles.
-        const avail = settings.autoModels.filter((m) => !settings.unavailableModels.includes(m));
+        // Modèles candidats = liste autorisée (réglages) ∩ liste RÉELLE chargée ∩ non-indispo.
+        // (la liste autorisée peut être figée sur d'anciens ID → on la recale sur le live).
+        const liveIds = new Set(modelStore.available.map((m) => m.v));
+        let avail = settings.autoModels.filter(
+          (m) => liveIds.has(m) && !settings.unavailableModels.includes(m),
+        );
+        // Si rien de valide (IDs périmés), repli sur tous les modèles réels sauf Fable.
+        if (autoMod && !avail.length) {
+          avail = modelStore.available
+            .filter((m) => tierOf(m.v) !== "fable" && !settings.unavailableModels.includes(m.v))
+            .map((m) => m.v);
+        }
         // Efforts candidats = liste autorisée ∩ niveaux réellement détectés (si connus).
         const effs = this.effortLevels.length
           ? settings.autoEfforts.filter((e) => this.effortLevels.includes(e))
@@ -570,8 +580,8 @@ class SessionsStore {
         try {
           const pick = await ipc.autoPick(instruction, autoMod ? avail : [], autoEff ? effs : [], settings.autoPickModel || modelStore.pickerDefault);
           if (autoMod && pick.model) {
-            s.model = pick.model;
-            this.flash(s, "modelFlash", "auto: " + pick.model);
+            s.model = this.resolveModel(pick.model) ?? pick.model; // recale sur un ID réel
+            this.flash(s, "modelFlash", "auto: " + (s.model ?? pick.model));
           }
           if (autoEff && pick.effort) {
             s.effort = pick.effort;
