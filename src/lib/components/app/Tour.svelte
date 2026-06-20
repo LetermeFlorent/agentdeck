@@ -76,22 +76,20 @@
 
   function place() {
     const bw = bubEl?.offsetWidth ?? 300;
-    const bh = bubEl?.offsetHeight ?? 120;
+    const bh = bubEl?.offsetHeight ?? 140;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    // Bulle centrée horizontalement, en bande haute ou basse — toujours dans la fenêtre,
+    // et placée à l'opposé de l'élément surligné pour ne pas le cacher.
+    const left = clamp((vw - bw) / 2, M, vw - bw - M);
+    let top: number;
     if (!rect) {
-      pos = { left: (vw - bw) / 2, top: (vh - bh) / 2 };
-      return;
+      top = (vh - bh) / 2; // étape sans cible : centré
+    } else {
+      const elemTopHalf = rect.y + rect.h / 2 < vh / 2;
+      top = elemTopHalf ? vh - bh - 24 : 24; // élément en haut → bulle en bas, et inversement
     }
-    // Sous la cible si la place y est, sinon au-dessus.
-    let top = rect.y + rect.h + M;
-    if (top + bh > vh - M) {
-      const above = rect.y - bh - M;
-      top = above >= M ? above : clamp(top, M, vh - bh - M);
-    }
-    let left = rect.x + rect.w / 2 - bw / 2;
-    left = clamp(left, M, vw - bw - M);
-    pos = { left, top };
+    pos = { left, top: clamp(top, M, vh - bh - M) };
     placed = true;
   }
 
