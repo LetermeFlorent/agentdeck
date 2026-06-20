@@ -13,3 +13,7 @@ vite.config.ts.timestamp-*
 .shot*.png
 icon-src.png
 *.jsonl.tmp
+
+# Script de dev local (lance l'app avec le tuto de depart)
+start.bat
+.devrun.log

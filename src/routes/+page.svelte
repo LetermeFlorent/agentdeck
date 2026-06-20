@@ -17,6 +17,7 @@
   import HistoryPopup from "$lib/components/app/HistoryPopup.svelte";
   import Tour from "$lib/components/app/Tour.svelte";
   import { tour } from "$lib/stores/tour.svelte";
+  import { modelStore } from "$lib/stores/models.svelte";
   import Icon from "$lib/components/ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import SparkMark from "$lib/components/ui/SparkMark.svelte";
@@ -201,6 +202,7 @@
     if (auth.connected && !initialized) {
       initialized = true;
       usage.start();
+      modelStore.load(); // liste réelle des modèles (API), fallback si échec
       bootDeck();
     }
   });

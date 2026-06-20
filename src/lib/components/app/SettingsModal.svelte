@@ -13,7 +13,8 @@
     if (p) settings.setDefaultCwd(p);
   }
   import { tooltip } from "$lib/actions/tooltip";
-  import { MODELS, effortsFor, PERM_MODES } from "../chat/chat-config";
+  import { effortsFor, PERM_MODES } from "../chat/chat-config";
+  import { modelStore } from "$lib/stores/models.svelte";
   import * as ipc from "$lib/ipc";
   import { onMount } from "svelte";
   import { fly, fade, slide } from "svelte/transition";
@@ -39,7 +40,7 @@
     view = view === v ? "settings" : v;
   }
 
-  const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
+  const models = $derived(modelStore.available.filter((m) => !settings.unavailableModels.includes(m.v)));
   // Même logique que la listbox du chat : l'effort dépend du modèle (xhigh Opus/Fable, rien sur Haiku).
   const selModel = $derived(settings.defaultModel ?? sessions.effModel);
   const efforts = $derived(effortsFor(selModel));
@@ -200,7 +201,7 @@
         <div class="sublist" transition:slide={{ duration: 150 }}>
           <span class="sub">Modèles que l'auto peut choisir :</span>
           <div class="opts">
-            {#each MODELS as m (m.v)}
+            {#each modelStore.available as m (m.v)}
               <button
                 type="button"
                 class="opt"

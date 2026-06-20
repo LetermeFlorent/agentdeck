@@ -60,6 +60,7 @@ pub fn run() {
             commands::deps::check_claude,
             commands::deps::install_claude,
             commands::meta::usage_get,
+            commands::meta::claude_models,
             commands::meta::claude_defaults,
             commands::meta::subscription_plan,
             commands::library::skills_installed,

@@ -7,6 +7,46 @@ pub fn usage_get(store: tauri::State<'_, UsageStore>) -> UsageSnapshot {
     usage::snapshot(&store)
 }
 
+/// Liste les modèles réellement disponibles pour le compte (API Models d'Anthropic),
+/// avec le token OAuth du coffre. Renvoie `[{v: id, l: display_name}]`, ou vide si
+/// indisponible (offline / token sans accès) → le frontend garde sa liste de secours.
+#[tauri::command]
+pub async fn claude_models() -> Vec<serde_json::Value> {
+    let token = match crate::auth::get_token() {
+        Some(t) => t,
+        None => return vec![],
+    };
+    let client = reqwest::Client::new();
+    let resp = client
+        .get("https://api.anthropic.com/v1/models?limit=100")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("anthropic-beta", "oauth-2025-04-20")
+        .header("anthropic-version", "2023-06-01")
+        .header("User-Agent", "claude-code/2.1.178")
+        .send()
+        .await;
+    let resp = match resp {
+        Ok(r) if r.status().is_success() => r,
+        _ => return vec![],
+    };
+    let v: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(_) => return vec![],
+    };
+    let mut out = vec![];
+    if let Some(arr) = v.get("data").and_then(|d| d.as_array()) {
+        for m in arr {
+            let id = m.get("id").and_then(|x| x.as_str()).unwrap_or("");
+            if !id.starts_with("claude-") {
+                continue;
+            }
+            let name = m.get("display_name").and_then(|x| x.as_str()).unwrap_or(id);
+            out.push(serde_json::json!({ "v": id, "l": name }));
+        }
+    }
+    out
+}
+
 /// Modèle / effort par défaut pour un nouveau pane : on récupère ceux du Claude Code
 /// courant (cache statusline) ; sinon valeurs par défaut (Opus / medium).
 #[tauri::command]

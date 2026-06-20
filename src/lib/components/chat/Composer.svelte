@@ -6,7 +6,8 @@
   import SlashPopup from "./SlashPopup.svelte";
   import PermissionsPopup from "./PermissionsPopup.svelte";
   import ContextGauge from "./ContextGauge.svelte";
-  import { MODELS, effortsFor, NON_HEADLESS_SLASH } from "./chat-config";
+  import { effortsFor, NON_HEADLESS_SLASH } from "./chat-config";
+  import { modelStore } from "$lib/stores/models.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import { fly } from "svelte/transition";
 
@@ -22,7 +23,7 @@
     if (s) s.draft = draft;
   });
 
-  const models = $derived(MODELS.filter((m) => !settings.unavailableModels.includes(m.v)));
+  const models = $derived(modelStore.available.filter((m) => !settings.unavailableModels.includes(m.v)));
   const efforts = $derived(effortsFor(session?.model));
 
   // --- Fichiers joints (avant envoi) : tous types, pas que les images ---

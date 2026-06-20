@@ -150,6 +150,9 @@ export const sessionClose = (id: string) => invoke<void>("session_close", { id }
 // ---- Usage ----
 export const usageGet = () => invoke<UsageSnapshot>("usage_get");
 
+// ---- Modèles disponibles (API Models, via token coffre) ----
+export const claudeModels = () => invoke<{ v: string; l: string }[]>("claude_models");
+
 // ---- Défauts modèle/effort (Claude Code courant) ----
 export const claudeDefaults = () =>
   invoke<{ model: string; effort: string }>("claude_defaults");

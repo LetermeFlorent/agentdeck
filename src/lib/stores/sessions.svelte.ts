@@ -7,7 +7,8 @@ import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
 import { activity } from "./activity.svelte";
 import { STORAGE_KEYS } from "./keys";
-import { PERM_MODES, MODELS, effortsFor } from "$lib/components/chat/chat-config";
+import { PERM_MODES, effortsFor } from "$lib/components/chat/chat-config";
+import { modelStore } from "./models.svelte";
 
 export interface ToolCall {
   name: string;
@@ -493,7 +494,7 @@ class SessionsStore {
   cycleModel(id: string) {
     const s = this.map[id];
     if (!s) return;
-    const avail = MODELS.filter((m) => !settings.unavailableModels.includes(m.v));
+    const avail = modelStore.available.filter((m) => !settings.unavailableModels.includes(m.v));
     if (!avail.length) return;
     const i = avail.findIndex((m) => m.v === s.model);
     const next = avail[(i + 1) % avail.length];
