@@ -1,8 +1,16 @@
 # agentdeck
 
+![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri)
+![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte)
+![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)
+[![Release](https://img.shields.io/github/v/release/LetermeFlorent/agentdeck?display_name=tag)](../../releases)
+
 Application desktop (Tauri + Rust + Svelte 5) pour piloter **plusieurs IA en parallèle**.
 Premier provider : **Claude Code** (sessions CLI orchestrées). L'architecture est multi-IA :
 d'autres providers se branchent en implémentant le trait `Provider` côté Rust, sans toucher au frontend.
+
+![agentdeck](docs/screenshots/main.png)
 
 ## Fonctionnalités
 
