@@ -37,18 +37,19 @@
   const M = 16; // marge écran
   const step = $derived(steps[idx]);
 
-  // Spotlight clampé dans la fenêtre (jamais hors écran).
+  // Spotlight = taille exacte du composant + 1 px autour (s'adapte à tout), clampé à l'écran.
   const spot = $derived.by(() => {
     if (!rect) return null;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const x = Math.max(2, rect.x - 6);
-    const y = Math.max(2, rect.y - 6);
+    const P = 1;
+    const x = Math.max(0, rect.x - P);
+    const y = Math.max(0, rect.y - P);
     return {
       x,
       y,
-      w: Math.min(rect.w + 12, vw - x - 2),
-      h: Math.min(rect.h + 12, vh - y - 2),
+      w: Math.min(rect.w + P * 2, vw - x),
+      h: Math.min(rect.h + P * 2, vh - y),
     };
   });
 
@@ -159,10 +160,10 @@
   /* Spotlight : trou clair sur la cible, le reste assombri via l'ombre portée géante. */
   .spot {
     position: absolute;
-    border-radius: 8px;
+    border-radius: 5px;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
     outline: 2px solid var(--accent);
-    outline-offset: 1px;
+    outline-offset: 0;
     transition: left 0.18s ease, top 0.18s ease, width 0.18s ease, height 0.18s ease;
     pointer-events: none;
   }
