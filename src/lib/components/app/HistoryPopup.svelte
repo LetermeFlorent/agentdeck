@@ -5,41 +5,60 @@
   import { settings } from "$lib/stores/settings.svelte";
   import * as ipc from "$lib/ipc";
   import { fly, fade } from "svelte/transition";
+  import { inView } from "$lib/actions/inView";
+  import { Reveal } from "$lib/util/paginate.svelte";
+  import Loader from "$lib/components/ui/Loader.svelte";
 
   let { onclose, now }: { onclose: () => void; now: number } = $props();
 
-  let items = $state<ipc.SessionHist[]>([]);
-  let results = $state<ipc.SessionHist[]>([]);
+  const PAGE = 20;
+  let items = $state<ipc.SessionHist[]>([]); // récents, paginés côté backend (offset)
+  let results = $state<ipc.SessionHist[]>([]); // résultats de recherche
   let query = $state("");
-  let loading = $state(true);
+  let loading = $state(true); // 1er chargement des récents
+  let loadingMore = $state(false); // page suivante des récents
+  let noMore = $state(false); // plus de pages récentes
   let searching = $state(false);
   let busy = $state("");
-  const shown = $derived(query.trim() ? results : items);
+  let offset = 0;
+  const searchReveal = new Reveal(PAGE); // rendu incrémental des résultats de recherche
+  const q = $derived(query.trim());
+  const shownSearch = $derived(results.slice(0, searchReveal.count));
 
-  onMount(async () => {
+  onMount(() => loadMore());
+
+  // Charge la page suivante de conversations récentes (lazy, au scroll).
+  async function loadMore() {
+    if (loadingMore || noMore) return;
+    loadingMore = true;
     try {
-      items = await ipc.recentSessions(settings.historyLimit);
+      const batch = await ipc.recentSessions(PAGE, offset);
+      items = [...items, ...batch];
+      offset += batch.length;
+      if (batch.length < PAGE) noMore = true;
     } catch {
-      /* ignore */
+      noMore = true;
     } finally {
+      loadingMore = false;
       loading = false;
     }
-  });
+  }
 
-  // Recherche globale debouncée (250 ms).
+  // Recherche globale debouncée (250 ms) ; les résultats sont révélés par lots au scroll.
   let timer: number | undefined;
   $effect(() => {
-    const q = query.trim();
+    const term = q;
     clearTimeout(timer);
-    if (!q) {
+    if (!term) {
       results = [];
       searching = false;
       return;
     }
     searching = true;
+    searchReveal.reset();
     timer = window.setTimeout(async () => {
       try {
-        results = await ipc.searchSessions(q, settings.historyLimit);
+        results = await ipc.searchSessions(term, settings.historyLimit);
       } catch {
         results = [];
       } finally {
@@ -97,13 +116,13 @@
     </div>
     <div class="list">
       {#if loading}
-        <div class="empty">Chargement…</div>
-      {:else if searching}
-        <div class="empty">Recherche…</div>
-      {:else if shown.length === 0}
-        <div class="empty">{query.trim() ? "Aucun résultat." : "Aucune conversation."}</div>
+        <Loader label="Chargement…" />
+      {:else if q && searching}
+        <Loader label="Recherche…" />
+      {:else if (q ? shownSearch.length : items.length) === 0}
+        <div class="empty">{q ? "Aucun résultat." : "Aucune conversation."}</div>
       {:else}
-        {#each shown as h (h.id)}
+        {#each q ? shownSearch : items as h (h.id)}
           <button class="item" disabled={busy === h.id} onclick={() => open(h)}>
             <span class="t">{h.title}</span>
             {#if h.snippet}<span class="snip">{h.snippet}</span>{/if}
@@ -112,6 +131,14 @@
             </span>
           </button>
         {/each}
+        {#if q ? searchReveal.hasMore(results.length) : !noMore}
+          <div
+            class="sentinel"
+            use:inView={{ once: false, onenter: () => (q ? searchReveal.more(results.length) : loadMore()) }}
+          >
+            {#if loadingMore}<Loader inline label="Chargement…" size={14} />{/if}
+          </div>
+        {/if}
       {/if}
     </div>
   </div>
@@ -199,5 +226,12 @@
     text-align: center;
     font-size: 12px;
     color: var(--text-faint);
+  }
+  .sentinel {
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
   }
 </style>

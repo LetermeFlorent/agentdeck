@@ -4,6 +4,9 @@
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import { slide } from "svelte/transition";
+  import { inView } from "$lib/actions/inView";
+  import { Reveal } from "$lib/util/paginate.svelte";
+  import Loader from "../ui/Loader.svelte";
 
   let adding = $state(false);
   let newName = $state("");
@@ -30,6 +33,12 @@
     }
   }
   const available = $derived(library.catalogSkills.filter((c) => !library.isSkillInstalled(c.name)));
+
+  // Rendu incrémental : on n'affiche pas tout d'un coup, on révèle par lots au scroll.
+  const revInstalled = new Reveal(16);
+  const revAvail = new Reveal(16);
+  const shownInstalled = $derived(library.installedSkills.slice(0, revInstalled.count));
+  const shownAvail = $derived(available.slice(0, revAvail.count));
 </script>
 
 <div class="lib">
@@ -58,7 +67,7 @@
 
   <div class="scroll">
     <div class="grid">
-      {#each library.installedSkills as s (s.name)}
+      {#each shownInstalled as s (s.name)}
         <div class="card">
           <div class="c-top">
             <span class="c-name">{s.name}</span>
@@ -79,12 +88,15 @@
         </div>
       {/each}
     </div>
+    {#if revInstalled.hasMore(library.installedSkills.length)}
+      <div class="sentinel" use:inView={{ once: false, onenter: () => revInstalled.more(library.installedSkills.length) }}></div>
+    {/if}
 
-    <div class="sep">Disponibles {library.loadingCat ? "…" : ""}</div>
+    <div class="sep">Disponibles {#if library.loadingCat}<Loader inline size={12} />{/if}</div>
 
     <div class="grid">
-      {#each available as c (c.name)}
-        <div class="card">
+      {#each shownAvail as c (c.name)}
+        <div class="card" use:inView={{ onenter: () => library.loadSkillDesc(c.name) }}>
           <div class="c-top">
             <span class="c-name">{c.name}</span>
             <button
@@ -93,13 +105,20 @@
               use:tooltip={"Installer ce skill"}
               onclick={() => library.installSkill(c.name)}
             >
-              {#if library.busy === c.name}…{:else}<Icon name="download" size={13} />{/if}
+              {#if library.busy === c.name}<Loader inline size={12} />{:else}<Icon name="download" size={13} />{/if}
             </button>
           </div>
-          {#if c.description}<span class="c-desc">{c.description}</span>{/if}
+          {#if c.description}
+            <span class="c-desc">{c.description}</span>
+          {:else}
+            <span class="c-desc loading"><Loader inline size={11} /></span>
+          {/if}
         </div>
       {/each}
     </div>
+    {#if revAvail.hasMore(available.length)}
+      <div class="sentinel" use:inView={{ once: false, onenter: () => revAvail.more(available.length) }}></div>
+    {/if}
     {#if !library.loadingCat && available.length === 0}
       <div class="empty">Tous les skills du catalogue sont installés.</div>
     {/if}
@@ -274,5 +293,12 @@
     padding: 10px 0;
     font-size: 11.5px;
     color: var(--text-faint);
+  }
+  .c-desc.loading {
+    opacity: 0.6;
+  }
+  .sentinel {
+    grid-column: 1 / -1;
+    min-height: 8px;
   }
 </style>

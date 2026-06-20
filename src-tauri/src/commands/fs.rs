@@ -59,7 +59,7 @@ pub fn list_dirs(path: Option<String>) -> DirList {
             dirs.push(DirEntry { name, path: p.display().to_string() });
         }
     }
-    dirs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    dirs.sort_by_key(|d| d.name.to_lowercase());
     DirList {
         path: base.display().to_string(),
         parent: base.parent().map(|p| p.display().to_string()),

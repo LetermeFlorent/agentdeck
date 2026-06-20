@@ -36,6 +36,8 @@ export interface SessionState {
   error: string | null;
   collapsed: boolean;
   priv: boolean;
+  /** En veille : le process claude en fond est tué (éco RAM) ; réveil au clic/focus. */
+  asleep: boolean;
   /** Messages tapés pendant que Claude travaille : envoyés l'un après l'autre. */
   queue: string[];
   /** Début du tour en cours (ms) pour l'indicateur de réflexion ; null si inactif. */
@@ -204,6 +206,7 @@ class SessionsStore {
       error: null,
       collapsed: false,
       priv: false,
+      asleep: false,
       queue: [],
       turnStart: null,
       turnTokens: 0,
@@ -256,6 +259,7 @@ class SessionsStore {
       error: null,
       collapsed: false,
       priv: false,
+      asleep: false,
       queue: [],
       turnStart: null,
       turnTokens: 0,
@@ -309,6 +313,7 @@ class SessionsStore {
       error: null,
       collapsed: p.collapsed ?? false,
       priv: p.priv ?? false,
+      asleep: false,
       queue: [],
       turnStart: null,
       turnTokens: 0,
@@ -575,16 +580,44 @@ class SessionsStore {
     }
   }
 
-  /** Marque une activité sur le chat (saisie, focus…) → repousse la veille privée. */
+  /** Marque une activité sur le chat (saisie, focus…) → repousse la veille + réveille. */
   touchActivity(id: string) {
     const s = this.map[id];
-    if (s) s.lastActivity = Date.now();
+    if (!s) return;
+    s.lastActivity = Date.now();
+    if (s.asleep) {
+      s.asleep = false; // le process repart au prochain envoi via --resume
+      this.touch();
+    }
   }
 
-  /** Surveille l'inactivité : passe un chat en mode privé après le délai réglé (Paramètres). */
+  /** Met manuellement un chat en veille (bouton) : tue le process, garde les messages. */
+  sleepNow(id: string) {
+    const s = this.map[id];
+    if (s && !s.asleep) {
+      s.asleep = true;
+      this.stop(id); // tue le process claude (RAM libérée)
+      this.touch();
+    }
+  }
+
+  /** Réveille un chat en veille (clic sur le pane) sans rien envoyer. */
+  wake(id: string) {
+    const s = this.map[id];
+    if (s?.asleep) {
+      s.asleep = false;
+      s.lastActivity = Date.now();
+      this.touch();
+    }
+  }
+
+  /** Surveille l'inactivité : mode privé (floute) + veille (tue le process) après les délais réglés. */
   startPrivacyWatch() {
     if (this.privacyTimer !== null) return;
-    this.privacyTimer = window.setInterval(() => this.checkPrivacy(), 15_000);
+    this.privacyTimer = window.setInterval(() => {
+      this.checkPrivacy();
+      this.checkSleep();
+    }, 15_000);
   }
   stopPrivacyWatch() {
     if (this.privacyTimer !== null) {
@@ -600,6 +633,20 @@ class SessionsStore {
     for (const s of Object.values(this.map)) {
       if (!s.priv && !s.streaming && now - s.lastActivity > ms) {
         s.priv = true;
+        this.touch();
+      }
+    }
+  }
+
+  /** Veille : tue le process claude des chats inactifs (éco RAM). Réveil au clic/envoi. */
+  private checkSleep() {
+    if (!settings.chatSleepEnabled) return;
+    const ms = settings.chatSleepMin * 60_000;
+    const now = Date.now();
+    for (const s of Object.values(this.map)) {
+      if (!s.asleep && !s.streaming && now - s.lastActivity > ms) {
+        s.asleep = true;
+        this.stop(s.id); // tue le process, garde l'enregistrement + les messages
         this.touch();
       }
     }
@@ -635,7 +682,7 @@ class SessionsStore {
     const tools = asst?.toolCalls.map((t) => `${t.name}: ${t.input}`).join(" ; ") ?? "";
     const summary = `${asst?.text ?? ""}\n${tools}`.trim().slice(0, 2000);
     // Best-effort, asynchrone, ne bloque pas l'UI.
-    ipc.reflectAndLearn(null, request.slice(0, 2000), summary, errorText.slice(0, 1000)).catch(() => {});
+    ipc.reflectAndLearn(s.cwd || null, request.slice(0, 2000), summary, errorText.slice(0, 1000)).catch(() => {});
   }
 
   private lastAssistant(s: SessionState): Msg {

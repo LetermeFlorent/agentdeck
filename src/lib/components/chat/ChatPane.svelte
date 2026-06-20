@@ -70,8 +70,8 @@
       role="button"
       tabindex="0"
       use:tooltip={`${session?.title ?? "Claude"} — déplier`}
-      onclick={() => sessions.setCollapsed(sid, false)}
-      onkeydown={(e) => e.key === "Enter" && sessions.setCollapsed(sid, false)}
+      onclick={() => { sessions.setCollapsed(sid, false); sessions.wake(sid); }}
+      onkeydown={(e) => e.key === "Enter" && (sessions.setCollapsed(sid, false), sessions.wake(sid))}
     >
       <span class="chev" style={`transform: rotate(${expandRot}deg)`}><Icon name="chevron" size={14} /></span>
       <span class="status" class:live={session?.streaming}></span>
@@ -82,6 +82,13 @@
     <PaneHeader {sid} {nodeId} {canMinimize} {collapseSide} {collapseDir} {siblingCollapsed} {canMove} {onsplit} {onclose} />
     <MessageLog {sid} />
     <Composer {sid} />
+    {#if session?.asleep}
+      <button class="sleep-ov" onclick={() => sessions.wake(sid)} use:tooltip={"Clique pour réveiller ce chat"}>
+        <span class="sl-ic"><Icon name="sleep" size={24} /></span>
+        <span class="sl-t">Chat en veille</span>
+        <span class="sl-s">Mémoire libérée · clique pour reprendre</span>
+      </button>
+    {/if}
   {/if}
 </div>
 
@@ -105,6 +112,43 @@
   .chev {
     display: flex;
     transition: transform var(--transition), color var(--transition);
+  }
+  /* Overlay « en veille » : couvre le chat suspendu, clic = réveil. */
+  .sleep-ov {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    backdrop-filter: blur(3px);
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .sleep-ov:hover {
+    background: color-mix(in srgb, var(--surface) 64%, transparent);
+  }
+  .sl-ic {
+    display: flex;
+    color: var(--text-muted);
+    opacity: 0.8;
+    animation: sleepPulse 2.4s ease-in-out infinite;
+  }
+  .sl-t {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+  }
+  .sl-s {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  @keyframes sleepPulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 0.9; }
   }
   /* Bande latérale quand le chat est minimisé sur le côté */
   .strip {

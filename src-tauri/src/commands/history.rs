@@ -112,17 +112,19 @@ fn all_jsonl_desc() -> Vec<(PathBuf, u64)> {
             }
         }
     }
-    files.sort_by(|a, b| b.1.cmp(&a.1));
+    files.sort_by_key(|f| std::cmp::Reverse(f.1));
     files
 }
 
-/// Liste les `limit` sessions les plus récentes (toutes confondues), titre + date.
+/// Liste une page de sessions récentes (toutes confondues), titre + date.
+/// `offset` = nombre d'items à sauter (pagination), `limit` = taille de page.
 #[tauri::command]
-pub fn recent_sessions(limit: usize) -> Vec<SessionHist> {
-    let mut files = all_jsonl_desc();
-    files.truncate(limit.clamp(1, 200));
+pub fn recent_sessions(limit: usize, offset: usize) -> Vec<SessionHist> {
+    let files = all_jsonl_desc();
     files
         .into_iter()
+        .skip(offset)
+        .take(limit.clamp(1, 200))
         .map(|(p, ts)| {
             let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
             let (title, cwd) = read_meta(&p);

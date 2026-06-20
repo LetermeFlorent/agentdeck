@@ -20,6 +20,8 @@ interface Persisted {
   autoEfforts: string[];
   historyLimit: number;
   defaultCwd: string;
+  chatSleepEnabled: boolean;
+  chatSleepMin: number;
 }
 
 class SettingsStore {
@@ -51,6 +53,10 @@ class SettingsStore {
   historyLimit = $state(30);
   /** Dossier de travail par défaut des nouveaux chats (vide = dossier personnel). */
   defaultCwd = $state("");
+  /** Veille des chats : suspend (tue le process claude) un chat inactif pour économiser la RAM. */
+  chatSleepEnabled = $state(false);
+  /** Minutes d'inactivité avant mise en veille d'un chat. */
+  chatSleepMin = $state(15);
 
   load() {
     try {
@@ -71,6 +77,8 @@ class SettingsStore {
       this.autoEfforts = p.autoEfforts ?? ["low", "medium", "high", "xhigh", "max"];
       this.historyLimit = p.historyLimit ?? 30;
       this.defaultCwd = p.defaultCwd ?? "";
+      this.chatSleepEnabled = p.chatSleepEnabled ?? false;
+      this.chatSleepMin = p.chatSleepMin ?? 15;
     } catch {
       /* ignore */
     }
@@ -96,6 +104,8 @@ class SettingsStore {
       autoEfforts: this.autoEfforts,
       historyLimit: this.historyLimit,
       defaultCwd: this.defaultCwd,
+      chatSleepEnabled: this.chatSleepEnabled,
+      chatSleepMin: this.chatSleepMin,
     };
     try {
       localStorage.setItem(KEY, JSON.stringify(p));
@@ -157,6 +167,15 @@ class SettingsStore {
   }
   setHistoryLimit(v: number) {
     this.historyLimit = Math.min(200, Math.max(1, Math.round(v) || 30));
+    this.save();
+  }
+  setChatSleepEnabled(v: boolean) {
+    this.chatSleepEnabled = v;
+    this.save();
+  }
+  /** Délai d'inactivité (min) avant veille, borné à [1, 240]. */
+  setChatSleepMin(v: number) {
+    this.chatSleepMin = Math.min(240, Math.max(1, Math.round(v) || 15));
     this.save();
   }
   /** Coche/décoche un effort de la liste auto. */

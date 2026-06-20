@@ -3,7 +3,10 @@
   import { library } from "$lib/stores/library.svelte";
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
-  import { slide } from "svelte/transition";
+  import { slide, fade } from "svelte/transition";
+  import { inView } from "$lib/actions/inView";
+  import { Reveal } from "$lib/util/paginate.svelte";
+  import Loader from "../ui/Loader.svelte";
 
   let adding = $state(false);
   let mode = $state<"url" | "json">("url");
@@ -47,6 +50,12 @@
     }
   }
   const available = $derived(library.catalogMcp.filter((c) => !library.isMcpInstalled(c.name)));
+
+  // Rendu incrémental : révèle les serveurs par lots au scroll (le catalogue peut être long).
+  const revInstalled = new Reveal(16);
+  const revAvail = new Reveal(16);
+  const shownInstalled = $derived(library.installedMcp.slice(0, revInstalled.count));
+  const shownAvail = $derived(available.slice(0, revAvail.count));
 </script>
 
 <div class="lib">
@@ -64,11 +73,15 @@
         <button class="mt" class:on={mode === "json"} onclick={() => (mode = "json")}>Config JSON</button>
       </div>
       <input class="f-in full" placeholder="nom du serveur" bind:value={newName} />
-      {#if mode === "url"}
-        <input class="f-in full" placeholder="https://… (serveur distant)" bind:value={newTarget} />
-      {:else}
-        <textarea class="f-area" rows="6" placeholder={JSON_PLACEHOLDER} bind:value={newJson}></textarea>
-      {/if}
+      {#key mode}
+        <div class="mode-pane" in:fade={{ duration: 130 }}>
+          {#if mode === "url"}
+            <input class="f-in full" placeholder="https://… (serveur distant)" bind:value={newTarget} />
+          {:else}
+            <textarea class="f-area" rows="6" placeholder={JSON_PLACEHOLDER} bind:value={newJson}></textarea>
+          {/if}
+        </div>
+      {/key}
       <button
         class="f-ok"
         disabled={!newName.trim() || (mode === "url" ? !newTarget.trim() : !newJson.trim())}
@@ -81,7 +94,7 @@
 
   <div class="scroll">
     <div class="grid">
-      {#each library.installedMcp as m (m.name)}
+      {#each shownInstalled as m (m.name)}
         <div class="card">
           <div class="c-top">
             <span class="c-name">{m.name}</span>
@@ -106,11 +119,14 @@
         </div>
       {/each}
     </div>
+    {#if revInstalled.hasMore(library.installedMcp.length)}
+      <div class="sentinel" use:inView={{ once: false, onenter: () => revInstalled.more(library.installedMcp.length) }}></div>
+    {/if}
 
-    <div class="sep">Disponibles {library.loadingCat ? "…" : ""}</div>
+    <div class="sep">Disponibles {#if library.loadingCat}<Loader inline size={12} />{/if}</div>
 
     <div class="grid">
-      {#each available as c (c.name)}
+      {#each shownAvail as c (c.name)}
         <div class="card">
           <div class="c-top">
             <span class="c-name">{c.title}</span>
@@ -120,13 +136,16 @@
               use:tooltip={"Ajouter ce serveur"}
               onclick={() => library.addMcp(c.name, c.url, c.transport)}
             >
-              {#if library.busy === c.name}…{:else}<Icon name="download" size={13} />{/if}
+              {#if library.busy === c.name}<Loader inline size={12} />{:else}<Icon name="download" size={13} />{/if}
             </button>
           </div>
           {#if c.description}<span class="c-desc">{c.description}</span>{/if}
         </div>
       {/each}
     </div>
+    {#if revAvail.hasMore(available.length)}
+      <div class="sentinel" use:inView={{ once: false, onenter: () => revAvail.more(available.length) }}></div>
+    {/if}
     {#if !library.loadingCat && available.length === 0}
       <div class="empty">Aucun serveur supplémentaire disponible.</div>
     {/if}
@@ -174,6 +193,10 @@
   .mode-tabs {
     display: flex;
     gap: 4px;
+  }
+  .mode-pane {
+    display: flex;
+    flex-direction: column;
   }
   .mt {
     flex: 1;
@@ -322,5 +345,8 @@
     padding: 10px 0;
     font-size: 11.5px;
     color: var(--text-faint);
+  }
+  .sentinel {
+    min-height: 8px;
   }
 </style>

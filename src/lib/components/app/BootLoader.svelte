@@ -10,6 +10,20 @@
     "restauration des sessions",
     "préparation du deck",
   ];
+  // Petite phrase qui change à chaque lancement.
+  const PHRASES = [
+    "le sommet est si proche",
+    "chaque token compte",
+    "plusieurs cerveaux valent mieux qu'un",
+    "les agents s'éveillent",
+    "l'orchestre s'accorde",
+    "respire, ça va être rapide",
+    "café chargé, prompts prêts",
+    "le deck se met en place",
+    "prépare-toi à orchestrer",
+    "on assemble les idées…",
+  ];
+  const phrase = PHRASES[Math.floor(Math.random() * PHRASES.length)];
   let frame = $state(0);
   let step = $state(0);
 
@@ -74,6 +88,8 @@
       <span class="prompt">$</span> bonjour {username || "à toi"}
       <span class="caret"></span>
     </p>
+
+    <p class="tagline">« {phrase} »</p>
 
     <div class="steps">
       {#each STEPS as s, i}
@@ -147,6 +163,13 @@
   .prompt {
     color: var(--accent);
     margin-right: 4px;
+  }
+  .tagline {
+    margin: -6px 0 2px;
+    color: var(--text-faint);
+    font-size: 12px;
+    font-style: italic;
+    letter-spacing: 0.02em;
   }
   .caret {
     display: inline-block;

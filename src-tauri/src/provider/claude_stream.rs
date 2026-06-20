@@ -190,12 +190,12 @@ pub(super) fn handle_line(
                 }
             }
         }
-        Some("assistant") => {
-            // Message assistant complet (non streamé via stream_event). Cas typique :
-            // sortie d'une commande slash built-in (/usage, /context, /cost…) qui ne
-            // produit pas de deltas. Si du texte a déjà été streamé pour ce tour, on
-            // ne ré-émet pas (le message complet est alors un doublon du flux).
-            if !*streamed {
+        // Message assistant complet (non streamé via stream_event). Cas typique :
+        // sortie d'une commande slash built-in (/usage, /context, /cost…) qui ne
+        // produit pas de deltas. Si du texte a déjà été streamé pour ce tour, on
+        // ne ré-émet pas (le message complet est alors un doublon du flux).
+        Some("assistant") if !*streamed => {
+            {
                 let text: String = v
                     .get("message")
                     .and_then(|m| m.get("content"))

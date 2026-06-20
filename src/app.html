@@ -1,13 +1,63 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%sveltekit.assets%/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Tauri + SvelteKit + Typescript App</title>
+    <title>agentdeck</title>
+    <!-- Applique le thème AVANT le 1er paint (sinon flash blanc le temps que le JS boote en mode SPA). -->
+    <script>
+      (function () {
+        try {
+          var c = localStorage.getItem("agentdeck.theme") || "light";
+          var dark =
+            c === "dark" ||
+            (c === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+        } catch (e) {}
+      })();
+    </script>
+    <!-- Splash statique : affiché instantanément (HTML), retiré quand l'app monte (+layout). -->
+    <style>
+      html { background: #ffffff; }
+      html[data-theme="dark"] { background: #1b1a18; }
+      #preboot {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        background: #ffffff;
+        color: #6b6b70;
+        font-family: ui-monospace, "JetBrains Mono", "SFMono-Regular", "Consolas", monospace;
+        letter-spacing: 0.04em;
+      }
+      html[data-theme="dark"] #preboot {
+        background: #1b1a18;
+        color: #8d8880;
+      }
+      #preboot .d {
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        background: #bd5d3b;
+        animation: pb 1.1s ease-in-out infinite;
+      }
+      html[data-theme="dark"] #preboot .d {
+        background: #cc7a5c;
+      }
+      @keyframes pb {
+        0%, 100% { opacity: 0.4; transform: scale(0.9); }
+        50% { opacity: 1; transform: scale(1.05); }
+      }
+    </style>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">
     <div style="display: contents">%sveltekit.body%</div>
+    <div id="preboot"><div class="d"></div><span>agentdeck</span></div>
   </body>
 </html>

@@ -15,7 +15,7 @@
   import { MODELS, effortsFor, PERM_MODES } from "../chat/chat-config";
   import * as ipc from "$lib/ipc";
   import { onMount } from "svelte";
-  import { fly, fade } from "svelte/transition";
+  import { fly, fade, slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
 
   // Niveaux d'effort détectés dynamiquement (pour les cases « auto effort »).
@@ -162,14 +162,14 @@
       onclick={() => settings.setAutoEffort(!settings.autoEffort)}
     >
       <div class="lbl">
-        <span>Effort automatique</span>
+        <span>Effort automatique <span class="cbadge save" use:tooltip={"Économise : route vers un effort moins coûteux quand c'est simple"}><Icon name="coin-down" size={11} /></span></span>
         <span class="sub">Analyse ta demande et règle l'effort tout seul</span>
       </div>
       <span class="switch" class:on={settings.autoEffort}><span class="knob"></span></span>
     </button>
 
     {#if settings.autoEffort}
-      <div class="sublist">
+      <div class="sublist" transition:slide={{ duration: 150 }}>
         <span class="sub">Efforts que l'auto peut choisir :</span>
         <div class="opts">
           {#each effLevels as e (e)}
@@ -189,14 +189,14 @@
         onclick={() => settings.setAutoModel(!settings.autoModel)}
       >
         <div class="lbl">
-          <span>Modèle automatique</span>
+          <span>Modèle automatique <span class="cbadge save" use:tooltip={"Économise : route vers un modèle moins cher quand c'est simple"}><Icon name="coin-down" size={11} /></span></span>
           <span class="sub">Route vers le modèle adapté selon la demande</span>
         </div>
         <span class="switch" class:on={settings.autoModel}><span class="knob"></span></span>
       </button>
 
       {#if settings.autoModel}
-        <div class="sublist">
+        <div class="sublist" transition:slide={{ duration: 150 }}>
           <span class="sub">Modèles que l'auto peut choisir :</span>
           <div class="opts">
             {#each MODELS as m (m.v)}
@@ -218,7 +218,7 @@
       onclick={() => settings.setHermesMode(!settings.hermesMode)}
     >
       <div class="lbl">
-        <span>Apprendre de ses erreurs (mode Hermes)</span>
+        <span>Apprendre de ses erreurs (mode Hermes) <span class="cbadge cost" use:tooltip={"Consomme plus : appel IA supplémentaire (Haiku) à chaque échec"}><Icon name="coin-up" size={11} /></span></span>
         <span class="sub">Consulte ses skills avant d'agir · transforme ses échecs en skills réutilisables</span>
       </div>
       <span class="switch" class:on={settings.hermesMode}><span class="knob"></span></span>
@@ -253,6 +253,49 @@
         <span class="unit">min</span>
       </div>
     </div>
+
+    <button
+      class="row check"
+      use:tooltip={"Suspend les chats inactifs : le process en fond est arrêté pour libérer la RAM. Un clic réveille le chat."}
+      onclick={() => settings.setChatSleepEnabled(!settings.chatSleepEnabled)}
+    >
+      <div class="lbl">
+        <span>Veille des chats <span class="cbadge save" use:tooltip={"Économise : libère la RAM des chats inactifs"}><Icon name="coin-down" size={11} /></span></span>
+        <span class="sub">Met en veille un chat inactif (libère la RAM) · clic pour réveiller</span>
+      </div>
+      <span class="switch" class:on={settings.chatSleepEnabled}><span class="knob"></span></span>
+    </button>
+
+    {#if settings.chatSleepEnabled}
+      <div class="row" transition:slide={{ duration: 150 }}>
+        <div class="lbl">
+          <span>Délai de veille</span>
+          <span class="sub">Minutes d'inactivité avant mise en veille</span>
+        </div>
+        <div class="priv-ctl">
+          {#each [5, 15, 30, 60] as m}
+            <button
+              type="button"
+              class="chip"
+              class:on={settings.chatSleepMin === m}
+              use:tooltip={`Après ${m} min d'inactivité`}
+              onclick={() => settings.setChatSleepMin(m)}
+            >{m}m</button>
+          {/each}
+          <input
+            class="num"
+            type="number"
+            min="1"
+            max="240"
+            step="1"
+            aria-label="Délai de veille en minutes"
+            value={settings.chatSleepMin}
+            oninput={(e) => settings.setChatSleepMin(+e.currentTarget.value)}
+          />
+          <span class="unit">min</span>
+        </div>
+      </div>
+    {/if}
 
     <div class="row">
       <div class="lbl">
@@ -514,5 +557,22 @@
     color: var(--text-faint);
     font-family: var(--font-mono);
     font-size: 12px;
+  }
+  /* Badge coût : indique qu'un réglage consomme plus (coin-up) ou économise (coin-down). */
+  .cbadge {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    margin-left: 4px;
+    padding: 1px;
+    border-radius: 50%;
+  }
+  .cbadge.cost {
+    color: var(--warn);
+    background: color-mix(in srgb, var(--warn) 14%, transparent);
+  }
+  .cbadge.save {
+    color: var(--good);
+    background: color-mix(in srgb, var(--good) 14%, transparent);
   }
 </style>

@@ -8,5 +8,6 @@ pub mod history;
 pub mod learn;
 pub mod library;
 pub mod meta;
+pub mod net;
 pub mod sessions;
 pub mod slash;

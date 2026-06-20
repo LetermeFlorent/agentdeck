@@ -32,6 +32,7 @@ pub fn session_restore(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)] // commande Tauri : paramètres mappés depuis le front
 pub fn session_send(
     app: tauri::AppHandle,
     mgr: tauri::State<'_, SessionManager>,

@@ -44,6 +44,8 @@ class LibraryStore {
   loadingCat = $state(false);
   busy = $state(""); // nom de l'item en cours d'action (install/delete)
   error = $state("");
+  /** Skills dont la description a déjà été demandée (évite les fetch répétés). */
+  private skillDescReq = new Set<string>();
 
   async refreshSkills() {
     try {
@@ -60,7 +62,7 @@ class LibraryStore {
     }
   }
 
-  /** Catalogue de skills : liste les dossiers du repo + leurs descriptions (en parallèle). */
+  /** Catalogue de skills : liste rapide des dossiers du repo (descriptions chargées à la demande). */
   async loadSkillCatalog() {
     if (this.catalogSkills.length) return;
     this.loadingCat = true;
@@ -70,24 +72,28 @@ class LibraryStore {
         headers: { Accept: "application/vnd.github+json" },
       });
       const dirs: { name: string; type: string }[] = await res.json();
-      const names = dirs.filter((d) => d.type === "dir").map((d) => d.name);
-      const items = await Promise.all(
-        names.map(async (name) => {
-          let description = "";
-          try {
-            const md = await (await fetch(`${SKILLS_RAW}/${name}/SKILL.md`)).text();
-            description = parseDesc(md);
-          } catch {
-            /* ignore */
-          }
-          return { name, description };
-        }),
-      );
-      this.catalogSkills = items;
+      // On affiche les noms immédiatement ; chaque description est chargée quand sa carte apparaît.
+      this.catalogSkills = dirs
+        .filter((d) => d.type === "dir")
+        .map((d) => ({ name: d.name, description: "" }));
     } catch (e) {
       this.error = `Catalogue skills indisponible : ${e}`;
     } finally {
       this.loadingCat = false;
+    }
+  }
+
+  /** Charge à la demande la description d'un skill du catalogue (carte devenue visible). */
+  async loadSkillDesc(name: string) {
+    if (this.skillDescReq.has(name)) return;
+    this.skillDescReq.add(name);
+    try {
+      const md = await (await fetch(`${SKILLS_RAW}/${name}/SKILL.md`)).text();
+      const desc = parseDesc(md);
+      const it = this.catalogSkills.find((c) => c.name === name);
+      if (it) it.description = desc;
+    } catch {
+      this.skillDescReq.delete(name); // échec → autorise une nouvelle tentative
     }
   }
 

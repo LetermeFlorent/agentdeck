@@ -73,6 +73,21 @@
     <path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M6.6 6.6A18.3 18.3 0 0 0 2 11s3.5 7 10 7a9 9 0 0 0 5.4-1.8" />
     <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
     <path d="M2 2l20 20" />
+  {:else if name === "wifi-off"}
+    <path d="M2 2l20 20" />
+    <path d="M8.5 16.4a5 5 0 0 1 7 0" />
+    <path d="M5 12.9a10 10 0 0 1 3.1-2.1M19 12.9a10 10 0 0 0-7.5-2.85" />
+    <path d="M1.4 9.2A15 15 0 0 1 6 6.2M22.6 9.2a15 15 0 0 0-9.5-3.06" />
+    <path d="M12 20h.01" />
+  {:else if name === "coin-up"}
+    <circle cx="12" cy="12" r="8" />
+    <path d="M12 15.5v-7M9.5 11 12 8.5 14.5 11" />
+  {:else if name === "coin-down"}
+    <circle cx="12" cy="12" r="8" />
+    <path d="M12 8.5v7M9.5 13l2.5 2.5 2.5-2.5" />
+  {:else if name === "sleep"}
+    <path d="M4 8h6l-6 8h6" />
+    <path d="M14 4h5l-5 6h5" />
   {:else if name === "chevron"}
     <path d="M6 9l6 6 6-6" />
   {:else if name === "check"}

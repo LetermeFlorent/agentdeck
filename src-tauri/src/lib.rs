@@ -75,6 +75,7 @@ pub fn run() {
             commands::history::recent_sessions,
             commands::history::search_sessions,
             commands::history::load_messages,
+            commands::net::net_check,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

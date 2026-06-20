@@ -29,6 +29,7 @@
     account: "",
   });
   let claudeReady = $state<boolean | null>(null);
+  let online = $state<boolean | null>(null);
   let installing = $state(false);
   let installErr = $state<string | null>(null);
   let showSettings = $state(false);
@@ -95,17 +96,16 @@
     theme.init();
     settings.load();
     checkForUpdates(); // auto-update en arrière-plan (silencieux si rien à faire)
-    try {
-      username = await ipc.osUsername();
-    } catch {
-      /* ignore */
-    }
-    try {
-      claudeReady = await ipc.checkClaude();
-    } catch {
-      claudeReady = false;
-    }
-    await auth.check();
+    // Démarrage parallèle : les vérifs sont indépendantes → durée ≈ la plus lente, pas la somme.
+    await Promise.all([
+      ipc.osUsername().then((u) => (username = u)).catch(() => {}),
+      ipc.checkClaude().then((r) => (claudeReady = r)).catch(() => (claudeReady = false)),
+      checkNet(),
+      auth.check(),
+    ]);
+    // Reconnexion / déconnexion détectée par l'OS → re-vérifie (débloque l'écran offline seul).
+    window.addEventListener("online", checkNet);
+    window.addEventListener("offline", () => (online = false));
     try {
       plan = await ipc.subscriptionPlan();
     } catch {
@@ -166,6 +166,20 @@
     );
   });
 
+  // Vérifie la connexion internet : navigator.onLine (instantané) + ping backend (réel).
+  async function checkNet() {
+    online = null;
+    if (!navigator.onLine) {
+      online = false;
+      return;
+    }
+    try {
+      online = await ipc.netCheck();
+    } catch {
+      online = false;
+    }
+  }
+
   async function installClaude() {
     installing = true;
     installErr = null;
@@ -201,7 +215,7 @@
       await layout.init();
       tabs.initFromLayout();
     }
-    // Loader visible au moins 3 s (minimum, pas maximum).
+    // Loader visible au moins 3 s (minimum), même si tout est déjà chargé en arrière-plan.
     const wait = 3000 - (Date.now() - t0);
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     booted = true;
@@ -253,15 +267,19 @@
       {/if}
     </div>
   </div>
-{:else if auth.checking || claudeReady === null}
-  <div class="boot" data-tauri-drag-region>
-    <div class="boot-dot"></div>
-    <span>agentdeck</span>
+{:else if online === false}
+  <div class="wrap" data-tauri-drag-region>
+    <div class="dep">
+      <div class="dep-ic"><Icon name="wifi-off" size={26} stroke={1.6} /></div>
+      <h1>Pas de connexion</h1>
+      <p>agentdeck a besoin d'internet (connexion à Claude, login). Vérifie ton réseau puis réessaie.</p>
+      <button class="btn btn-accent" onclick={checkNet}>Réessayer</button>
+    </div>
   </div>
+{:else if auth.checking || claudeReady === null || (auth.connected && !booted)}
+  <BootLoader {username} />
 {:else if !auth.connected}
   <Onboarding />
-{:else if !booted}
-  <BootLoader {username} />
 {:else}
   <div class="app">
     <!-- Titlebar custom : barre app + contrôles système fusionnés (déco OS désactivée). -->
@@ -452,29 +470,6 @@
   .dep-sep {
     color: var(--text-faint);
   }
-  .boot {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-  }
-  .boot-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 5px;
-    background: var(--accent);
-    animation: pulse 1.1s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 0.4; transform: scale(0.9); }
-    50% { opacity: 1; transform: scale(1.05); }
-  }
-
   .app {
     display: flex;
     flex-direction: column;

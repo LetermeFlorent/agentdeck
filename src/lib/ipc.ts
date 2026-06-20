@@ -125,8 +125,8 @@ export interface SessionHist {
   ts: number;
   snippet?: string;
 }
-export const recentSessions = (limit: number) =>
-  invoke<SessionHist[]>("recent_sessions", { limit });
+export const recentSessions = (limit: number, offset = 0) =>
+  invoke<SessionHist[]>("recent_sessions", { limit, offset });
 export const searchSessions = (query: string, limit: number) =>
   invoke<SessionHist[]>("search_sessions", { query, limit });
 export const loadMessages = (id: string) =>
@@ -157,6 +157,9 @@ export const claudeDefaults = () =>
 // ---- Plan d'abonnement ----
 export const subscriptionPlan = () =>
   invoke<{ label: string; level: number; account: string }>("subscription_plan");
+
+// ---- Connectivité réseau (gate au lancement) ----
+export const netCheck = () => invoke<boolean>("net_check");
 
 // ---- Dépendance Claude Code ----
 export const checkClaude = () => invoke<boolean>("check_claude");

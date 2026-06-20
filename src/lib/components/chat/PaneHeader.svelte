@@ -163,6 +163,13 @@
     >
       <Icon name={session?.priv ? "eye-off" : "eye"} size={15} />
     </button>
+    <button
+      class="icon-btn"
+      use:tooltip={"Mettre ce chat en veille (libère la RAM) — clic sur le chat pour réveiller"}
+      onclick={() => sessions.sleepNow(sid)}
+    >
+      <Icon name="sleep" size={15} />
+    </button>
     {#if canMinimize && !siblingCollapsed}
       <button class="icon-btn" use:tooltip={"Minimiser"} onclick={() => sessions.setCollapsed(sid, true)}>
         <span class="chev" style={`transform: rotate(${chevRot}deg)`}><Icon name="chevron" size={15} /></span>
