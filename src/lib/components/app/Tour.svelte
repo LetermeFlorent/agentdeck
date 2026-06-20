@@ -84,17 +84,29 @@
     const bh = bubEl?.offsetHeight ?? 140;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // Bulle centrée horizontalement, en bande haute ou basse — toujours dans la fenêtre,
-    // et placée à l'opposé de l'élément surligné pour ne pas le cacher.
-    const left = clamp((vw - bw) / 2, M, vw - bw - M);
-    let top: number;
+    const gap = 10;
     if (!rect) {
-      top = (vh - bh) / 2; // étape sans cible : centré
-    } else {
-      const elemTopHalf = rect.y + rect.h / 2 < vh / 2;
-      top = elemTopHalf ? vh - bh - 24 : 24; // élément en haut → bulle en bas, et inversement
+      pos = { left: (vw - bw) / 2, top: (vh - bh) / 2 };
+      placed = true;
+      return;
     }
-    pos = { left, top: clamp(top, M, vh - bh - M) };
+    // Bulle collée au contour : sous l'élément si la place y est, sinon au-dessus,
+    // sinon à côté (droite/gauche). Toujours clampée dans la fenêtre.
+    let left = clamp(rect.x + rect.w / 2 - bw / 2, M, vw - bw - M);
+    let top: number;
+    const belowTop = rect.y + rect.h + gap;
+    const aboveTop = rect.y - bh - gap;
+    if (belowTop + bh <= vh - M) {
+      top = belowTop;
+    } else if (aboveTop >= M) {
+      top = aboveTop;
+    } else {
+      top = clamp(rect.y, M, vh - bh - M);
+      const right = rect.x + rect.w + gap;
+      if (right + bw <= vw - M) left = right;
+      else if (rect.x - bw - gap >= M) left = rect.x - bw - gap;
+    }
+    pos = { left, top };
     placed = true;
   }
 
