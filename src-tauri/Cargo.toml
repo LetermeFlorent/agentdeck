@@ -1,6 +1,6 @@
 [package]
 name = "agentdeck"
-version = "0.1.0"
+version = "1.0.0"
 description = "Application desktop pour piloter plusieurs IA en parallèle (Claude Code en premier)."
 authors = ["Florent Leterme"]
 edition = "2021"
