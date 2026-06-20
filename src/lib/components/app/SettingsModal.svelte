@@ -13,8 +13,23 @@
     if (p) settings.setDefaultCwd(p);
   }
   import { tooltip } from "$lib/actions/tooltip";
-  import { effortsFor, PERM_MODES, autoPickPrompt } from "../chat/chat-config";
+  import { effortsFor, PERM_MODES, tierOf } from "../chat/chat-config";
   import { modelStore } from "$lib/stores/models.svelte";
+
+  // Active l'auto-modèle ; à l'activation, coche par défaut tous les modèles dispo sauf Fable
+  // (si aucun choix valide actuel).
+  function toggleAutoModel() {
+    const on = !settings.autoModel;
+    settings.setAutoModel(on);
+    if (on) {
+      const valid = settings.autoModels.filter((v) => modelStore.available.some((m) => m.v === v));
+      if (!valid.length) {
+        settings.setAutoModels(
+          modelStore.available.filter((m) => tierOf(m.v) !== "fable").map((m) => m.v),
+        );
+      }
+    }
+  }
   import * as ipc from "$lib/ipc";
   import { onMount } from "svelte";
   import { fly, fade, slide } from "svelte/transition";
@@ -32,18 +47,6 @@
   });
 
   let { onclose }: { onclose: () => void } = $props();
-
-  // Aperçu du prompt de sélection auto (popup).
-  let showAutoPrompt = $state(false);
-  const autoPreview = $derived(
-    autoPickPrompt(
-      "« ta demande ici »",
-      settings.autoModel
-        ? settings.autoModels.map((v) => modelStore.available.find((m) => m.v === v) ?? { v, l: v })
-        : [],
-      settings.autoEffort ? settings.autoEfforts.map((v) => ({ v, l: v })) : [],
-    ),
-  );
 
   // Vue active du modal : réglages | skills | serveurs MCP.
   let view = $state<"settings" | "skills" | "mcp">("settings");
@@ -200,7 +203,7 @@
       <button
         class="row check"
         use:tooltip={"Choisit aussi le modèle (léger pour le simple, puissant pour le complexe)"}
-        onclick={() => settings.setAutoModel(!settings.autoModel)}
+        onclick={toggleAutoModel}
       >
         <div class="lbl">
           <span>Modèle automatique <span class="cbadge save" use:tooltip={"Économise : route vers un modèle moins cher quand c'est simple"}><Icon name="coin-down" size={11} /></span></span>
@@ -230,21 +233,12 @@
           <span>Modèle qui choisit</span>
           <span class="sub">Décide la config selon ta demande · Haiku par défaut (le moins cher)</span>
         </div>
-        <div class="priv-ctl">
-          <Dropdown
-            label="Haiku"
-            options={models}
-            value={settings.autoPickModel || modelStore.pickerDefault}
-            onchange={(v) => settings.setAutoPickModel(v)}
-          />
-          <button
-            class="icon-btn pick-prompt"
-            use:tooltip={"Voir le prompt envoyé à ce modèle"}
-            onclick={() => (showAutoPrompt = true)}
-          >
-            <Icon name="terminal" size={15} />
-          </button>
-        </div>
+        <Dropdown
+          label="Haiku"
+          options={models}
+          value={settings.autoPickModel || modelStore.pickerDefault}
+          onchange={(v) => settings.setAutoPickModel(v)}
+        />
       </div>
     {/if}
 
@@ -396,32 +390,6 @@
     {/if}
   </div>
 </div>
-
-{#if showAutoPrompt}
-  <div
-    class="overlay"
-    role="presentation"
-    transition:fade={{ duration: 120 }}
-    onclick={() => (showAutoPrompt = false)}
-  >
-    <div
-      class="modal prompt-modal"
-      role="dialog"
-      aria-label="Prompt de sélection auto"
-      transition:fly={{ y: 12, duration: 200, easing: cubicOut }}
-      onclick={(e) => e.stopPropagation()}
-    >
-      <header class="m-head">
-        <span class="m-title">Prompt de sélection</span>
-        <button class="icon-btn" use:tooltip={"Fermer"} onclick={() => (showAutoPrompt = false)}>
-          <Icon name="close" />
-        </button>
-      </header>
-      <p class="prompt-note">Message réellement envoyé au modèle qui choisit la config (ta demande s'insère à la fin).</p>
-      <pre class="prompt-pre">{autoPreview}</pre>
-    </div>
-  </div>
-{/if}
 
 <style>
   .overlay {
@@ -644,39 +612,5 @@
   .cbadge.save {
     color: var(--good);
     background: color-mix(in srgb, var(--good) 14%, transparent);
-  }
-  .pick-prompt {
-    width: 26px;
-    height: 26px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    color: var(--text-muted);
-  }
-  .pick-prompt:hover {
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .prompt-modal {
-    max-width: 560px;
-  }
-  .prompt-note {
-    margin: 6px 0 8px;
-    font-size: 11.5px;
-    color: var(--text-muted);
-  }
-  .prompt-pre {
-    margin: 0;
-    max-height: 60vh;
-    overflow: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    padding: 10px 12px;
-    font-family: var(--font-mono);
-    font-size: 11.5px;
-    line-height: 1.5;
-    color: var(--text);
   }
 </style>

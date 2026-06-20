@@ -170,6 +170,11 @@ class SettingsStore {
     this.defaultCwd = v || "";
     this.save();
   }
+  /** Remplace la liste des modèles que l'auto peut choisir. */
+  setAutoModels(list: string[]) {
+    this.autoModels = [...list];
+    this.save();
+  }
   setAutoPickModel(v: string) {
     this.autoPickModel = v || "";
     this.save();
