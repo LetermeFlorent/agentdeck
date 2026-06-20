@@ -240,6 +240,12 @@ pub(super) fn handle_line(
                         .unwrap_or(0)
                 })
                 .unwrap_or(0);
+            // Modèle(s) réellement utilisé(s) = clés de modelUsage (ex. "claude-haiku-4-5").
+            let model = v
+                .get("modelUsage")
+                .and_then(Value::as_object)
+                .map(|m| m.keys().cloned().collect::<Vec<_>>().join(", "))
+                .unwrap_or_default();
             usage::record(app.state::<usage::UsageStore>().inner(), total, cost);
             emit(
                 app,
@@ -252,6 +258,7 @@ pub(super) fn handle_line(
                     context_tokens: context,
                     context_window,
                     is_error,
+                    model,
                 },
             );
         }

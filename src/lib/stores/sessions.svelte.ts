@@ -25,6 +25,8 @@ export interface Msg {
   toolCalls: ToolCall[];
   /** Vignettes (data URLs) des images jointes à un message utilisateur — affichage seul. */
   images?: string[];
+  /** Modèle réellement utilisé pour cette réponse (rempli à la fin du tour). */
+  model?: string;
 }
 
 export interface SessionState {
@@ -791,6 +793,11 @@ class SessionsStore {
         if (e.cost_usd >= s.costUsd || e.cost_usd === 0) s.costUsd = e.cost_usd || s.costUsd;
         else s.costUsd = e.cost_usd; // process relancé (modèle changé) → réinitialisé
         usage.refresh();
+        // Modèle réellement utilisé ce tour → l'attache à la dernière bulle assistant.
+        if (e.model) {
+          const last = s.messages[s.messages.length - 1];
+          if (last && last.role === "assistant") last.model = e.model;
+        }
         // Chat fini pendant que la fenêtre n'a pas le focus → clignote la barre des tâches.
         if (typeof document !== "undefined" && !document.hasFocus()) ipc.requestAttention();
         // Mode Hermes : tour soldé par une erreur → apprentissage auto.

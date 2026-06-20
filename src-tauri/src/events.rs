@@ -42,6 +42,8 @@ pub enum SessionEvent {
         /// Le tour s'est-il soldé par une erreur (`result.is_error`) ? Sert au mode Hermes
         /// (apprentissage auto sur échec).
         is_error: bool,
+        /// Modèle(s) réellement utilisé(s) pour ce tour (clés de `modelUsage`), pour affichage.
+        model: String,
     },
     /// Erreur (spawn, parse, auth…).
     Error { message: String },

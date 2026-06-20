@@ -98,6 +98,7 @@
           <!-- Markdown rendu (HTML échappé en amont par renderMarkdown). -->
           <div class="atext md">{@html renderMarkdown(msg.text)}</div>
         {/if}
+        {#if msg.model}<div class="amodel">— {msg.model}</div>{/if}
       </div>
     {/if}
   {/each}
@@ -195,6 +196,13 @@
     color: var(--text);
     white-space: pre-wrap;
     word-break: break-word;
+  }
+  /* Modèle réellement utilisé pour la réponse (petit, discret). */
+  .amodel {
+    margin-top: 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
   }
   /* Rendu markdown */
   .md :global(p) {
