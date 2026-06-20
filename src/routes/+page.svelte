@@ -287,7 +287,7 @@
   <div class="app">
     <!-- Titlebar custom : barre app + contrôles système fusionnés (déco OS désactivée). -->
     <header class="topbar" data-tauri-drag-region>
-      <div class="brand" data-tauri-drag-region>
+      <div class="brand" data-tour="brand" data-tauri-drag-region>
         <span class="mark" data-tauri-drag-region><SparkMark size={16} /></span>
         <span class="logo" data-tauri-drag-region>agentdeck</span>
         {#if plan.label}

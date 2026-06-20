@@ -1,6 +1,7 @@
 <script lang="ts">
   // Tour guidé du 1er lancement : spotlight sur un élément + bulle explicative, séquentiel.
   // Cible les éléments via leur attribut data-tour. Une étape sans cible est sautée.
+  // La bulle et le spotlight restent toujours dans la fenêtre (clamp).
   import { tour } from "$lib/stores/tour.svelte";
   import { fade } from "svelte/transition";
 
@@ -10,39 +11,79 @@
     text: string;
   }
   const ALL: Step[] = [
+    { sel: '[data-tour="brand"]', title: "Bienvenue sur agentdeck", text: "Pilote plusieurs sessions Claude Code en parallèle. Petit tour des fonctions clés." },
     { sel: '[data-tour="usage"]', title: "Ta consommation", text: "Tes limites Claude sur 5 h et 7 jours, en un coup d'œil." },
     { sel: '[data-tour="tabs"]', title: "Espaces de travail", text: "Crée des onglets pour séparer tes contextes (un projet = un onglet)." },
-    { sel: '[data-tour="split"]', title: "Plusieurs Claude à la fois", text: "Divise un pane en deux : fais bosser plusieurs sessions côte à côte." },
     { sel: '[data-tour="history"]', title: "Historique", text: "Retrouve et rouvre n'importe quelle conversation passée." },
     { sel: '[data-tour="settings"]', title: "Réglages", text: "Modèle par défaut, skills, serveurs MCP, veille des chats, thème…" },
+    { sel: '[data-tour="cwd"]', title: "Dossier de travail", text: "Le dossier où ce chat agit. Clique pour le changer (ton projet)." },
+    { sel: '[data-tour="split"]', title: "Plusieurs Claude à la fois", text: "Divise un pane en deux : fais bosser plusieurs sessions côte à côte." },
+    { sel: '[data-tour="model"]', title: "Modèle", text: "Choisis le modèle de ce chat (Opus, Sonnet, Haiku…)." },
+    { sel: '[data-tour="effort"]', title: "Effort", text: "Règle l'effort de réflexion. Plus haut = plus fouillé (et plus coûteux)." },
+    { sel: '[data-tour="perms"]', title: "Permissions", text: "Mode de permission + outils autorisés/refusés de l'agent." },
+    { sel: '[data-tour="slash"]', title: "Commandes /", text: "Accède aux commandes slash de Claude Code." },
+    { sel: '[data-tour="priv"]', title: "Mode privé", text: "Floute le contenu d'un chat (par-dessus l'épaule). Auto possible dans les réglages." },
+    { sel: '[data-tour="sleep"]', title: "Veille du chat", text: "Met le chat en veille : libère la RAM. Un clic sur le chat le réveille." },
+    { sel: '[data-tour="composer"]', title: "Écris à Claude", text: "Tape ici. Entrée pour envoyer, Maj+Entrée pour un retour à la ligne." },
   ];
 
   let steps = $state<Step[]>([]);
   let idx = $state(0);
   let rect = $state<{ x: number; y: number; w: number; h: number } | null>(null);
+  let pos = $state({ left: 0, top: 0 });
+  let bubEl = $state<HTMLDivElement | null>(null);
 
-  // Place la bulle sous la cible si elle est en haut de l'écran, sinon au-dessus.
-  const below = $derived(rect ? rect.y + rect.h < window.innerHeight / 2 : true);
+  const M = 12; // marge écran
+  const step = $derived(steps[idx]);
+
+  function clamp(v: number, min: number, max: number) {
+    return Math.max(min, Math.min(v, max));
+  }
 
   function measure() {
     const s = steps[idx];
-    if (!s) return;
-    const el = document.querySelector(s.sel) as HTMLElement | null;
+    const el = s ? (document.querySelector(s.sel) as HTMLElement | null) : null;
     if (!el) {
       rect = null;
+    } else {
+      const r = el.getBoundingClientRect();
+      rect = {
+        x: clamp(r.left, 0, window.innerWidth),
+        y: clamp(r.top, 0, window.innerHeight),
+        w: Math.min(r.width, window.innerWidth),
+        h: Math.min(r.height, window.innerHeight),
+      };
+    }
+    // Place la bulle après rendu (taille réelle connue), clampée dans la fenêtre.
+    requestAnimationFrame(place);
+  }
+
+  function place() {
+    const bw = bubEl?.offsetWidth ?? 300;
+    const bh = bubEl?.offsetHeight ?? 120;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    if (!rect) {
+      pos = { left: (vw - bw) / 2, top: (vh - bh) / 2 };
       return;
     }
-    const r = el.getBoundingClientRect();
-    rect = { x: r.left, y: r.top, w: r.width, h: r.height };
+    // Sous la cible si la place y est, sinon au-dessus.
+    let top = rect.y + rect.h + M;
+    if (top + bh > vh - M) {
+      const above = rect.y - bh - M;
+      top = above >= M ? above : clamp(top, M, vh - bh - M);
+    }
+    let left = rect.x + rect.w / 2 - bw / 2;
+    left = clamp(left, M, vw - bw - M);
+    pos = { left, top };
   }
 
   $effect(() => {
-    void idx; // recalcule à chaque changement d'étape
+    void idx;
     requestAnimationFrame(measure);
   });
 
   $effect(() => {
-    // Ne garde que les étapes dont la cible existe au lancement du tour.
     steps = ALL.filter((s) => document.querySelector(s.sel));
     idx = 0;
     requestAnimationFrame(measure);
@@ -58,20 +99,6 @@
   function prev() {
     if (idx > 0) idx -= 1;
   }
-  function skip() {
-    tour.done();
-  }
-
-  const step = $derived(steps[idx]);
-  // Position de la bulle (clampée à l'écran).
-  const bubble = $derived.by(() => {
-    if (!rect) return { left: window.innerWidth / 2 - 150, top: window.innerHeight / 2 - 60 };
-    const W = 300;
-    let left = rect.x + rect.w / 2 - W / 2;
-    left = Math.max(12, Math.min(left, window.innerWidth - W - 12));
-    const top = below ? rect.y + rect.h + 12 : rect.y - 12;
-    return { left, top };
-  });
 </script>
 
 {#if step}
@@ -85,18 +112,14 @@
       <div class="dim"></div>
     {/if}
 
-    <div
-      class="bub"
-      class:above={!below}
-      style={`left:${bubble.left}px;top:${bubble.top}px;${below ? "" : "transform:translateY(-100%);"}`}
-    >
+    <div class="bub" bind:this={bubEl} style={`left:${pos.left}px;top:${pos.top}px`}>
       <div class="b-head">
         <span class="b-title">{step.title}</span>
         <span class="b-count">{idx + 1}/{steps.length}</span>
       </div>
       <p class="b-text">{step.text}</p>
       <div class="b-actions">
-        <button class="b-skip" onclick={skip}>Passer</button>
+        <button class="b-skip" onclick={() => tour.done()}>Passer</button>
         <div class="b-nav">
           {#if idx > 0}<button class="b-btn ghost" onclick={prev}>Précédent</button>{/if}
           <button class="b-btn" onclick={next}>{idx < steps.length - 1 ? "Suivant" : "Terminer"}</button>
@@ -130,6 +153,7 @@
   .bub {
     position: absolute;
     width: 300px;
+    max-width: calc(100vw - 24px);
     background: var(--elevated);
     border: 1px solid var(--border);
     border-radius: var(--radius);

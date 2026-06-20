@@ -224,11 +224,12 @@
     <button
       type="button"
       class="cmd-btn"
+      data-tour="slash"
       class:on={showCmds}
       use:tooltip={"Commandes de Claude (/)"}
       onclick={toggleCmds}
     >/</button>
-    <span class="perm-wrap">
+    <span class="perm-wrap" data-tour="perms">
       <button
         type="button"
         class="cmd-btn"
@@ -250,7 +251,7 @@
         e.currentTarget.value = "";
       }}
     />
-    <span class="perm-wrap">
+    <span class="perm-wrap" data-tour="model">
       <Dropdown
         label="Modèle"
         options={models}
@@ -262,7 +263,7 @@
       {/if}
     </span>
     {#if efforts.length}
-      <span class="perm-wrap">
+      <span class="perm-wrap" data-tour="effort">
         <Dropdown
           label="Effort"
           options={efforts}
@@ -276,7 +277,7 @@
       </span>
     {/if}
   </div>
-  <form class="field eff-{session?.effort ?? 'medium'}" onsubmit={submit}>
+  <form class="field eff-{session?.effort ?? 'medium'}" data-tour="composer" onsubmit={submit}>
     <textarea
       bind:this={ta}
       placeholder="Message à Claude…"

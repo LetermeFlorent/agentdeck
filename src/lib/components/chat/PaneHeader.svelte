@@ -110,6 +110,7 @@
     {/if}
     <button
       class="cwd-chip"
+      data-tour="cwd"
       use:tooltip={`Dossier de travail : ${cwdPath || "—"} · cliquer pour changer`}
       onclick={(e) => { e.stopPropagation(); pickCwd(); }}
     >
@@ -157,6 +158,7 @@
     </button>
     <button
       class="icon-btn"
+      data-tour="priv"
       class:on={session?.priv}
       use:tooltip={session?.priv ? "Désactiver le mode privé" : "Mode privé (flouter le contenu)"}
       onclick={() => sessions.setPrivate(sid, !session?.priv)}
@@ -165,6 +167,7 @@
     </button>
     <button
       class="icon-btn"
+      data-tour="sleep"
       use:tooltip={"Mettre ce chat en veille (libère la RAM) — clic sur le chat pour réveiller"}
       onclick={() => sessions.sleepNow(sid)}
     >
