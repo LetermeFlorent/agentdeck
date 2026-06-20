@@ -7,7 +7,7 @@ import { usage } from "./usage.svelte";
 import { settings } from "./settings.svelte";
 import { activity } from "./activity.svelte";
 import { STORAGE_KEYS } from "./keys";
-import { PERM_MODES, effortsFor, autoPickPrompt } from "$lib/components/chat/chat-config";
+import { PERM_MODES, effortsFor, autoPickPrompt, tierOf } from "$lib/components/chat/chat-config";
 import { modelStore } from "./models.svelte";
 
 export interface ToolCall {
@@ -181,9 +181,20 @@ class SessionsStore {
     }
   }
 
+  /** Résout un modèle (alias/ID) vers un ID présent dans la liste réelle (sinon dernier du tier). */
+  resolveModel(m: string | null | undefined): string | null {
+    if (!m) return m ?? null;
+    const list = modelStore.available;
+    if (list.some((x) => x.v === m)) return m; // déjà un ID valide
+    const t = tierOf(m);
+    if (!t) return m;
+    const same = list.filter((x) => tierOf(x.v) === t).sort((a, b) => b.v.localeCompare(a.v));
+    return same.length ? same[0].v : m; // dernier du même tier, sinon tel quel
+  }
+
   /** Défaut effectif = override utilisateur (réglages) sinon modèle/effort Claude Code courant. */
   get effModel(): string | null {
-    return settings.defaultModel ?? this.defaultModel;
+    return this.resolveModel(settings.defaultModel ?? this.defaultModel);
   }
   get effEffort(): string | null {
     return settings.defaultEffort ?? this.defaultEffort;
@@ -199,7 +210,7 @@ class SessionsStore {
     this.map[id] = {
       id,
       title: opts.title ?? "Claude",
-      model: opts.model ?? this.effModel,
+      model: opts.model ? this.resolveModel(opts.model) : this.effModel,
       effort: this.effEffort,
       cwd,
       messages: [],
@@ -307,7 +318,7 @@ class SessionsStore {
     this.map[p.id] = {
       id: p.id,
       title: p.title,
-      model: p.model ?? this.effModel,
+      model: p.model ? this.resolveModel(p.model) : this.effModel,
       effort: p.effort ?? this.effEffort,
       messages: p.messages,
       streaming: false,
