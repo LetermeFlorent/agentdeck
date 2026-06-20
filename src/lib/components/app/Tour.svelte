@@ -31,10 +31,26 @@
   let idx = $state(0);
   let rect = $state<{ x: number; y: number; w: number; h: number } | null>(null);
   let pos = $state({ left: 0, top: 0 });
+  let placed = $state(false); // évite le flash de la bulle au coin (0,0) avant calcul
   let bubEl = $state<HTMLDivElement | null>(null);
 
-  const M = 12; // marge écran
+  const M = 16; // marge écran
   const step = $derived(steps[idx]);
+
+  // Spotlight clampé dans la fenêtre (jamais hors écran).
+  const spot = $derived.by(() => {
+    if (!rect) return null;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const x = Math.max(2, rect.x - 6);
+    const y = Math.max(2, rect.y - 6);
+    return {
+      x,
+      y,
+      w: Math.min(rect.w + 12, vw - x - 2),
+      h: Math.min(rect.h + 12, vh - y - 2),
+    };
+  });
 
   function clamp(v: number, min: number, max: number) {
     return Math.max(min, Math.min(v, max));
@@ -76,6 +92,7 @@
     let left = rect.x + rect.w / 2 - bw / 2;
     left = clamp(left, M, vw - bw - M);
     pos = { left, top };
+    placed = true;
   }
 
   $effect(() => {
@@ -89,7 +106,13 @@
     requestAnimationFrame(measure);
     const onResize = () => measure();
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    // Replace la bulle dès que sa taille réelle est connue / change (contenu variable).
+    const ro = bubEl ? new ResizeObserver(() => place()) : null;
+    if (bubEl && ro) ro.observe(bubEl);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      ro?.disconnect();
+    };
   });
 
   function next() {
@@ -103,16 +126,16 @@
 
 {#if step}
   <div class="tour" transition:fade={{ duration: 150 }}>
-    {#if rect}
+    {#if spot}
       <div
         class="spot"
-        style={`left:${rect.x - 6}px;top:${rect.y - 6}px;width:${rect.w + 12}px;height:${rect.h + 12}px`}
+        style={`left:${spot.x}px;top:${spot.y}px;width:${spot.w}px;height:${spot.h}px`}
       ></div>
     {:else}
       <div class="dim"></div>
     {/if}
 
-    <div class="bub" bind:this={bubEl} style={`left:${pos.left}px;top:${pos.top}px`}>
+    <div class="bub" bind:this={bubEl} style={`left:${pos.left}px;top:${pos.top}px;visibility:${placed ? "visible" : "hidden"}`}>
       <div class="b-head">
         <span class="b-title">{step.title}</span>
         <span class="b-count">{idx + 1}/{steps.length}</span>
