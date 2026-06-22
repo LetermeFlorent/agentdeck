@@ -117,6 +117,19 @@
     <path d="M6 19h13" />
   {:else if name === "plug"}
     <path d="M9 2v6M15 2v6M7 8h10v3a5 5 0 0 1-10 0V8ZM12 16v6" />
+  {:else if name === "package"}
+    <path d="M21 8 12 3 3 8v8l9 5 9-5V8ZM3 8l9 5 9-5M12 13v8" />
+  {:else if name === "logo-claude"}
+    <!-- Anthropic "A" mark -->
+    <path d="M12 3.5 L4 20.5 h3.8 l1.7-4.2h5l1.7 4.2h3.8z M10.3 13.1l1.7-4.2 1.7 4.2z" fill="currentColor" stroke="none" />
+  {:else if name === "logo-opencode"}
+    <!-- brackets >_ terminal -->
+    <path d="M7 7.5 L3.5 12 L7 16.5" stroke-width={stroke} />
+    <path d="M17 7.5 L20.5 12 L17 16.5" stroke-width={stroke} />
+    <path d="M10.5 12 h7" stroke-width={stroke * 0.8} />
+  {:else if name === "logo-gemini"}
+    <!-- Gemini 4-pointed star -->
+    <path d="M12 2C10.5 7.5 7.5 10.5 2 12C7.5 13.5 10.5 16.5 12 22C13.5 16.5 16.5 13.5 22 12C16.5 10.5 13.5 7.5 12 2Z" fill="currentColor" stroke="none" />
   {:else if name === "grip"}
     <g fill="currentColor" stroke="none">
       <circle cx="9" cy="6" r="1.4" />

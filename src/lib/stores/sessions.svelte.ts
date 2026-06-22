@@ -3,12 +3,13 @@
 import * as ipc from "$lib/ipc";
 import type { SessionEvent } from "$lib/ipc";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { usage } from "./usage.svelte";
+import { usage } from "./data/usage.svelte";
 import { settings } from "./settings.svelte";
-import { activity } from "./activity.svelte";
+import { activity } from "./data/activity.svelte";
 import { STORAGE_KEYS } from "./keys";
-import { PERM_MODES, effortsFor, autoPickPrompt, tierOf } from "$lib/components/chat/chat-config";
-import { modelStore } from "./models.svelte";
+import { PERM_MODES, PROVIDERS, effortsForProvider, autoPickPrompt, tierOf, providerInfo, providerOfModel } from "$lib/components/chat/chat-config";
+import { modelStore } from "./data/models.svelte";
+import { auth } from "./auth.svelte";
 
 export interface ToolCall {
   name: string;
@@ -27,11 +28,19 @@ export interface Msg {
   images?: string[];
   /** Modèle réellement utilisé pour cette réponse (rempli à la fin du tour). */
   model?: string;
+  /** Effort réellement utilisé pour cette réponse (snapshot du choix auto/manuel au moment du tour). */
+  effort?: string;
+  /** Passe de réflexion multi-tour : numéro et total (ex. {n:2, total:3}). */
+  pass?: { n: number; total: number };
+  /** Message auto-envoyé par le système (passe de vérification) — affiché de façon compacte. */
+  autoPass?: boolean;
 }
 
 export interface SessionState {
   id: string;
   title: string;
+  /** IA pilotée par ce chat : "claude_code" (défaut), "opencode" ou "gemini". */
+  provider: string;
   model: string | null;
   effort: string | null;
   messages: Msg[];
@@ -78,11 +87,16 @@ export interface SessionState {
   draft: string;
   /** Dossier de travail (où est le projet) ; Claude y est lancé (current_dir). */
   cwd: string;
+  /** Passe de réflexion multi-tour en cours (1-based). 0 = inactif. */
+  reflectPass: number;
+  /** Nombre total de passes de réflexion demandées. 0 = inactif. */
+  reflectTotal: number;
 }
 
 export interface PersistedSession {
   id: string;
   title: string;
+  provider?: string;
   model: string | null;
   effort: string | null;
   messages: Msg[];
@@ -114,8 +128,8 @@ class SessionsStore {
   homePath = $state("");
   /** Derniers dossiers de travail utilisés (récents), pour le sélecteur. */
   cwdRecents = $state<string[]>([]);
-  /** Commandes slash exposées par Claude Code (nom + description, récupérées dynamiquement). */
-  slashCommands = $state<ipc.SlashCmd[]>([]);
+  /** Commandes slash par provider (nom + description, récupérées dynamiquement). */
+  slashCommandsByProvider = $state<Record<string, ipc.SlashCmd[]>>({});
   /** Outils disponibles exposés par Claude Code (init), pour le panneau Permissions. */
   tools = $state<string[]>([]);
   /** Chat actuellement focus (composer) — cible des raccourcis clavier (Ctrl+Tab). */
@@ -124,7 +138,12 @@ class SessionsStore {
   effortLevels = $state<string[]>([]);
   private unlisteners: Record<string, UnlistenFn> = {};
   private privacyTimer: number | null = null;
-  private slashFetched = false;
+  private slashFetchedFor = new Set<string>();
+
+  /** Retourne les commandes slash du provider courant. */
+  slashCommandsFor(provider: string): ipc.SlashCmd[] {
+    return this.slashCommandsByProvider[provider] ?? [];
+  }
 
   private touch() {
     this.persistRev++;
@@ -159,27 +178,28 @@ class SessionsStore {
     }
   }
 
-  /** Charge la liste des commandes slash (cache localStorage + fetch backend), pour le « / » immédiat. */
-  async loadSlashCommands() {
-    // Cache (instantané) pour l'affichage, puis fetch backend pour rafraîchir/compléter.
-    if (this.slashCommands.length === 0) {
+  /** Charge les commandes slash du provider donné (cache localStorage + fetch backend). */
+  async loadSlashCommands(provider: string) {
+    const cacheKey = `${STORAGE_KEYS.slash}:${provider}`;
+    if (!this.slashCommandsByProvider[provider]?.length) {
       try {
-        const cached = JSON.parse(localStorage.getItem(STORAGE_KEYS.slash) || "[]");
-        if (Array.isArray(cached) && cached.length) this.slashCommands = cached;
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || "[]");
+        if (Array.isArray(cached) && cached.length)
+          this.slashCommandsByProvider[provider] = cached;
       } catch {
         /* ignore */
       }
     }
-    if (this.slashFetched) return; // un seul fetch backend par session (spawn process)
-    this.slashFetched = true;
+    if (this.slashFetchedFor.has(provider)) return;
+    this.slashFetchedFor.add(provider);
     try {
-      const list = await ipc.slashCommandsFetch();
+      const list = await ipc.slashCommandsFetch(provider);
       if (list.length) {
-        this.slashCommands = list;
-        localStorage.setItem(STORAGE_KEYS.slash, JSON.stringify(list));
+        this.slashCommandsByProvider[provider] = list;
+        localStorage.setItem(cacheKey, JSON.stringify(list));
       }
     } catch {
-      this.slashFetched = false; // échec → autorise une nouvelle tentative
+      this.slashFetchedFor.delete(provider);
     }
   }
 
@@ -196,24 +216,37 @@ class SessionsStore {
 
   /** Défaut effectif = override utilisateur (réglages) sinon modèle/effort Claude Code courant. */
   get effModel(): string | null {
-    return this.resolveModel(settings.defaultModel ?? this.defaultModel);
+    return this.resolveModel(settings.defaultModelFor("claude_code") ?? this.defaultModel);
   }
   get effEffort(): string | null {
-    return settings.defaultEffort ?? this.defaultEffort;
+    return settings.defaultEffortFor("claude_code") ?? this.defaultEffort;
   }
   /** Dossier de travail par défaut = réglage utilisateur, sinon dossier personnel. */
   get effCwd(): string {
     return settings.defaultCwd || this.homePath;
   }
 
-  async create(opts: { title?: string; cwd?: string; model?: string } = {}): Promise<string> {
+  async create(opts: { title?: string; cwd?: string; model?: string; provider?: string } = {}): Promise<string> {
     const cwd = opts.cwd ?? this.effCwd;
-    const id = await ipc.sessionCreate({ title: opts.title, cwd, model: opts.model });
+    const provider = opts.provider ?? (auth.anyConnected ? (PROVIDERS.find((p) => auth.isConnected(p.id))?.id ?? "claude_code") : "claude_code");
+    const id = await ipc.sessionCreate({ title: opts.title, cwd, model: opts.model, provider });
+    // Charge la liste réelle du provider avant de choisir le modèle.
+    if (provider !== "claude_code") await modelStore.loadFor(provider);
+    // Modèle par défaut : Claude → défaut utilisateur ; autres → défaut réglé sinon 1er modèle.
+    const model =
+      provider === "claude_code"
+        ? opts.model
+          ? this.resolveModel(opts.model)
+          : this.effModel
+        : opts.model ?? settings.defaultModelFor(provider) ?? modelStore.visibleFor(provider).find((m) => m.v.includes("-free"))?.v ?? modelStore.visibleFor(provider)[0]?.v ?? null;
     this.map[id] = {
       id,
-      title: opts.title ?? "Claude",
-      model: opts.model ? this.resolveModel(opts.model) : this.effModel,
-      effort: this.effEffort,
+      title: opts.title ?? PROVIDERS.find((p) => p.id === provider)?.label ?? "Claude",
+      provider,
+      model,
+      effort: providerInfo(provider).hasEffort
+        ? (settings.defaultEffortFor(provider) ?? (provider === "claude_code" ? this.effEffort : "medium"))
+        : null,
       cwd,
       messages: [],
       streaming: false,
@@ -240,6 +273,8 @@ class SessionsStore {
       autoModelOff: false,
       autoEffortOff: false,
       draft: "",
+      reflectPass: 0,
+      reflectTotal: 0,
     };
     this.focusedSid = id;
     await this.attach(id);
@@ -266,6 +301,7 @@ class SessionsStore {
     this.map[id] = {
       id,
       title: title || "Claude",
+      provider: "claude_code",
       model: this.effModel,
       effort: this.effEffort,
       messages: msgs.map((m) => ({ role: m.role, text: m.text, thinking: "", toolCalls: [] })),
@@ -294,6 +330,8 @@ class SessionsStore {
       autoEffortOff: false,
       draft: "",
       cwd: cwd || this.effCwd,
+      reflectPass: 0,
+      reflectTotal: 0,
     };
     this.focusedSid = id;
     await this.attach(id);
@@ -310,17 +348,21 @@ class SessionsStore {
 
   private async hydrateOne(p: PersistedSession) {
     const started = p.messages.some((m) => m.role === "user");
+    const provider = p.provider ?? "claude_code";
     await ipc.sessionRestore({
       id: p.id,
       title: p.title,
       started,
       cwd: p.cwd ?? this.effCwd,
       model: p.model ?? undefined,
+      provider,
     });
+    if (provider !== "claude_code") modelStore.loadFor(provider);
     this.map[p.id] = {
       id: p.id,
       title: p.title,
-      model: p.model ? this.resolveModel(p.model) : this.effModel,
+      provider,
+      model: provider === "claude_code" ? (p.model ? this.resolveModel(p.model) : this.effModel) : p.model,
       effort: p.effort ?? this.effEffort,
       messages: p.messages,
       streaming: false,
@@ -348,6 +390,8 @@ class SessionsStore {
       autoEffortOff: p.autoEffortOff ?? false,
       draft: "",
       cwd: p.cwd ?? this.effCwd,
+      reflectPass: 0,
+      reflectTotal: 0,
     };
     await this.attach(p.id);
   }
@@ -356,6 +400,7 @@ class SessionsStore {
     return Object.values(this.map).map((s) => ({
       id: s.id,
       title: s.title,
+      provider: s.provider,
       model: s.model,
       effort: s.effort,
       // Quota localStorage : on ne persiste ni les data URLs d'images ni la réflexion (volumineuse).
@@ -411,11 +456,35 @@ class SessionsStore {
     this.touch();
   }
 
-  /** Change le modèle / l'effort d'un pane (appliqué au prochain tour). */
+  /** Change l'IA d'un pane : réinitialise modèle/effort sur ceux du nouveau provider + recharge la liste. */
+  async setProvider(id: string, provider: string) {
+    const s = this.map[id];
+    if (!s || s.provider === provider) return;
+    const oldLabel = PROVIDERS.find((p) => p.id === (s.provider ?? "claude_code"))?.label ?? "Claude";
+    const newLabel = PROVIDERS.find((p) => p.id === provider)?.label ?? provider;
+    if (!s.title || s.title === oldLabel) s.title = newLabel;
+    s.provider = provider;
+    await modelStore.loadFor(provider);
+    s.model = modelStore.visibleFor(provider).find((m) => m.v.includes("-free"))?.v ?? modelStore.visibleFor(provider)[0]?.v ?? null;
+    s.effort = providerInfo(provider).hasEffort
+      ? (settings.defaultEffortFor(provider) ?? (provider === "claude_code" ? this.effEffort : "medium"))
+      : null;
+    // Coupe l'éventuel process en cours (ex. Claude persistant) — relancé au prochain envoi.
+    this.stop(id);
+    this.touch();
+  }
+
+  /** Change le modèle d'un pane (appliqué au prochain tour). Réinitialise l'effort si incompatible. */
   setModel(id: string, model: string) {
     const s = this.map[id];
     if (!s) return;
     s.model = model || null;
+    const valid = effortsForProvider(s.provider, s.model).map((e) => e.v);
+    if (valid.length && s.effort && !valid.includes(s.effort)) {
+      s.effort = s.provider === "claude_code" ? this.effEffort : (settings.defaultEffortFor(s.provider) ?? "medium");
+    } else if (!valid.length) {
+      s.effort = null;
+    }
     this.touch();
   }
   setEffort(id: string, effort: string) {
@@ -507,7 +576,7 @@ class SessionsStore {
   cycleModel(id: string) {
     const s = this.map[id];
     if (!s) return;
-    const avail = modelStore.available.filter((m) => !settings.unavailableModels.includes(m.v));
+    const avail = modelStore.visibleFor(s.provider).filter((m) => !settings.isUnavailable(s.provider, m.v));
     if (!avail.length) return;
     const i = avail.findIndex((m) => m.v === s.model);
     const next = avail[(i + 1) % avail.length];
@@ -519,7 +588,7 @@ class SessionsStore {
   cycleEffort(id: string) {
     const s = this.map[id];
     if (!s) return;
-    const list = effortsFor(s.model);
+    const list = effortsForProvider(s.provider, s.model);
     if (!list.length) {
       this.flash(s, "effortFlash", "Non réglable");
       return;
@@ -559,48 +628,114 @@ class SessionsStore {
         if (autoEff && !this.effortLevels.length) {
           try { this.effortLevels = await ipc.effortLevels(); } catch { /* ignore */ }
         }
-        // Modèles candidats = liste autorisée (réglages) ∩ liste RÉELLE chargée ∩ non-indispo.
-        // (la liste autorisée peut être figée sur d'anciens ID → on la recale sur le live).
-        const liveIds = new Set(modelStore.available.map((m) => m.v));
-        let avail = settings.autoModels.filter(
-          (m) => liveIds.has(m) && !settings.unavailableModels.includes(m),
-        );
-        // Si rien de valide (IDs périmés), repli sur tous les modèles réels sauf Fable.
-        if (autoMod && !avail.length) {
-          avail = modelStore.available
-            .filter((m) => tierOf(m.v) !== "fable" && !settings.unavailableModels.includes(m.v))
-            .map((m) => m.v);
+        // Candidats MODÈLES : cross-IA si auto-modèle (toutes IA connectées), sinon l'IA du chat.
+        // Le sélecteur « IA configurée » des réglages ne sert qu'à AFFICHER les listes ; ici on
+        // réunit les candidats cochés de chaque IA → l'auto peut router vers Claude OU opencode OU Gemini.
+        const provs = autoMod
+          ? ["claude_code", "opencode", "gemini"].filter((p) => auth.isConnected(p))
+          : [s.provider];
+        const idProv = new Map<string, string>();
+        const modelInfos: { v: string; l: string }[] = [];
+        for (const p of provs) {
+          const vis = modelStore.visibleFor(p);
+          const liveIds = new Set(vis.map((m) => m.v));
+          let sel = settings.autoModelsFor(p).filter((m) => liveIds.has(m) && !settings.isUnavailable(p, m));
+          // Aucun candidat coché pour l'IA du chat seule → repli sur ses modèles dispo (sauf Fable).
+          if (autoMod && !sel.length && provs.length === 1) {
+            sel = vis.filter((m) => tierOf(m.v) !== "fable" && !settings.isUnavailable(p, m.v)).map((m) => m.v);
+          }
+          for (const mid of sel) {
+            if (idProv.has(mid)) continue;
+            idProv.set(mid, p);
+            const info = modelStore.availableFor(p).find((m) => m.v === mid) ?? { v: mid, l: mid };
+            modelInfos.push({ v: mid, l: `${providerInfo(p).label}: ${info.l}` }); // préfixe IA pour le picker
+          }
         }
-        // Efforts candidats = liste autorisée ∩ niveaux réellement détectés (si connus).
-        const effs = this.effortLevels.length
-          ? settings.autoEfforts.filter((e) => this.effortLevels.includes(e))
-          : settings.autoEfforts;
-        // Résout les libellés des modèles candidats (pour prix/récence dans le prompt).
-        const modelInfos = avail.map((v) => modelStore.available.find((m) => m.v === v) ?? { v, l: v });
+        const availIds = modelInfos.map((m) => m.v);
+        // Efforts candidats = union des IA concernées.
+        const effSet = new Set<string>();
+        for (const p of provs) for (const e of settings.autoEffortsFor(p)) effSet.add(e);
+        let effs = [...effSet];
+        if (s.provider === "claude_code" && !autoMod && this.effortLevels.length) {
+          effs = effs.filter((e) => this.effortLevels.includes(e));
+        }
         const effInfos = effs.map((v) => ({ v, l: v }));
         const instruction = autoPickPrompt(text, autoMod ? modelInfos : [], autoEff ? effInfos : []);
         try {
-          const pick = await ipc.autoPick(instruction, autoMod ? avail : [], autoEff ? effs : [], settings.autoPickModel || modelStore.pickerDefault);
+          // Picker GLOBAL unique : un seul décideur (n'importe quelle IA connectée) choisit IA + modèle.
+          const picker = settings.autoPicker || modelStore.pickerDefaultFor(s.provider);
+          const pick = await ipc.autoPick(providerOfModel(picker), instruction, autoMod ? availIds : [], autoEff ? effs : [], picker, settings.autoPickerEffort || "low");
           if (autoMod && pick.model) {
-            s.model = this.resolveModel(pick.model) ?? pick.model; // recale sur un ID réel
-            this.flash(s, "modelFlash", "auto: " + (s.model ?? pick.model));
+            const newProv = idProv.get(pick.model) ?? providerOfModel(pick.model);
+            if (newProv !== s.provider) {
+              await this.stop(id); // coupe l'ancien process (ex. Claude persistant)
+              s.provider = newProv;
+              modelStore.loadFor(newProv);
+            }
+            s.model = pick.model;
+            this.flash(s, "modelFlash", "auto: " + providerInfo(newProv).label + " " + pick.model);
           }
           if (autoEff && pick.effort) {
-            s.effort = pick.effort;
-            this.flash(s, "effortFlash", "auto: " + pick.effort);
+            // Valide l'effort pour l'IA finale (l'effort dépend du modèle/IA).
+            const valid = effortsForProvider(s.provider, s.model).some((e) => e.v === pick.effort);
+            if (valid) {
+              s.effort = pick.effort;
+              this.flash(s, "effortFlash", "auto: " + pick.effort);
+            }
           }
         } catch { /* ignore : garde le réglage courant */ }
       }
       // Permissions : refusés = outils décochés + règles refusées ; autorisés = règles avancées.
       const deny = [...s.disabledTools, ...(s.denyRules ? [s.denyRules] : [])].join(",");
+      const passes = settings.hermesReflectPasses ?? 1;
+      if (passes > 1) {
+        s.reflectPass = 1;
+        s.reflectTotal = passes;
+      } else {
+        s.reflectPass = 0;
+        s.reflectTotal = 0;
+      }
+      const finalText = text;
       await ipc.sessionSend(
         id,
-        text,
+        finalText,
         s.model,
         s.effort,
         images.map((i) => ({ media_type: i.media_type, data: i.data, name: i.name })),
         settings.hermesMode,
         { mode: s.permMode, allowed: s.allowRules || null, disallowed: deny || null },
+        s.provider,
+      );
+    } catch (err) {
+      s.error = String(err);
+      s.streaming = false;
+    }
+  }
+
+  /** Envoie automatiquement une passe de vérification multi-tour. */
+  async sendReflectPass(id: string, n: number, total: number) {
+    const s = this.map[id];
+    if (!s || s.streaming) return;
+    s.reflectPass = n;
+    s.reflectTotal = total;
+    const verifyPrompt = `[Passe ${n}/${total} — Vérification] Relis ta réponse précédente. Identifie les erreurs, imprécisions ou points manquants. Corrige et complète.`;
+    s.messages.push({ role: "user", text: verifyPrompt, thinking: "", toolCalls: [], autoPass: true, pass: { n, total } });
+    s.streaming = true;
+    s.error = null;
+    s.turnStart = Date.now();
+    s.turnTokens = 0;
+    s.messages.push({ role: "assistant", text: "", thinking: "", toolCalls: [] });
+    try {
+      const deny = [...s.disabledTools, ...(s.denyRules ? [s.denyRules] : [])].join(",");
+      await ipc.sessionSend(
+        id,
+        verifyPrompt,
+        s.model,
+        s.effort,
+        [],
+        settings.hermesMode,
+        { mode: s.permMode, allowed: s.allowRules || null, disallowed: deny || null },
+        s.provider,
       );
     } catch (err) {
       s.error = String(err);
@@ -701,6 +836,11 @@ class SessionsStore {
     this.touch();
   }
 
+  /** Ferme TOUTES les sessions (vrai logout : tue les process CLI + fichiers session backend). */
+  async closeAll() {
+    await Promise.all(Object.keys(this.map).map((id) => this.close(id)));
+  }
+
   /** Mode Hermes : sur échec, demande au backend de réfléchir et d'en tirer un skill. */
   private maybeLearn(s: SessionState, errorText: string) {
     if (!settings.hermesMode) return;
@@ -710,7 +850,7 @@ class SessionsStore {
     const tools = asst?.toolCalls.map((t) => `${t.name}: ${t.input}`).join(" ; ") ?? "";
     const summary = `${asst?.text ?? ""}\n${tools}`.trim().slice(0, 2000);
     // Best-effort, asynchrone, ne bloque pas l'UI.
-    ipc.reflectAndLearn(s.cwd || null, request.slice(0, 2000), summary, errorText.slice(0, 1000)).catch(() => {});
+    ipc.reflectAndLearn(s.cwd || null, request.slice(0, 2000), summary, errorText.slice(0, 1000), settings.hermesModel || undefined, s.provider || undefined).catch(() => {});
   }
 
   private lastAssistant(s: SessionState): Msg {
@@ -732,16 +872,18 @@ class SessionsStore {
       case "init":
         if (e.tools?.length) this.tools = e.tools;
         if (e.slash_commands.length > 0) {
-          // Fusionne : garde les descriptions déjà connues, ajoute les noms manquants.
-          const have = new Set(this.slashCommands.map((c) => c.name));
-          const merged = [...this.slashCommands];
+          const prov = s.provider ?? "claude_code";
+          const cacheKey = `${STORAGE_KEYS.slash}:${prov}`;
+          const existing = this.slashCommandsByProvider[prov] ?? [];
+          const have = new Set(existing.map((c) => c.name));
+          const merged = [...existing];
           for (const n of e.slash_commands) {
-            if (!have.has(n)) merged.push({ name: n, description: "", args: "" });
+            if (!have.has(n)) merged.push({ name: n, description: "", args: "", cli: "Claude" });
           }
-          if (merged.length !== this.slashCommands.length) {
-            this.slashCommands = merged;
+          if (merged.length !== existing.length) {
+            this.slashCommandsByProvider[prov] = merged;
             try {
-              localStorage.setItem(STORAGE_KEYS.slash, JSON.stringify(merged));
+              localStorage.setItem(cacheKey, JSON.stringify(merged));
             } catch {
               /* ignore */
             }
@@ -793,10 +935,26 @@ class SessionsStore {
         if (e.cost_usd >= s.costUsd || e.cost_usd === 0) s.costUsd = e.cost_usd || s.costUsd;
         else s.costUsd = e.cost_usd; // process relancé (modèle changé) → réinitialisé
         usage.refresh();
-        // Modèle réellement utilisé ce tour → l'attache à la dernière bulle assistant.
-        if (e.model) {
+        // Modèle + effort réellement utilisés ce tour → attachés à la dernière bulle assistant.
+        // L'effort = `s.effort` (déjà écrasé par le choix AUTO en amont si l'auto est actif),
+        // snapshot ici pour ne pas bouger si l'utilisateur change le dropdown ensuite.
+        {
           const last = s.messages[s.messages.length - 1];
-          if (last && last.role === "assistant") last.model = e.model;
+          if (last && last.role === "assistant") {
+            if (e.model) last.model = e.model;
+            if (s.effort) last.effort = s.effort;
+            if (s.reflectPass > 0 && s.reflectTotal > 0) {
+              last.pass = { n: s.reflectPass, total: s.reflectTotal };
+              if (s.reflectPass < s.reflectTotal) {
+                const nextPass = s.reflectPass + 1;
+                const total = s.reflectTotal;
+                setTimeout(() => this.sendReflectPass(id, nextPass, total), 400);
+              } else {
+                s.reflectPass = 0;
+                s.reflectTotal = 0;
+              }
+            }
+          }
         }
         // Chat fini pendant que la fenêtre n'a pas le focus → clignote la barre des tâches.
         if (typeof document !== "undefined" && !document.hasFocus()) ipc.requestAttention();
@@ -806,17 +964,29 @@ class SessionsStore {
         this.touch();
         break;
       case "error": {
-        s.error = e.message;
-        s.streaming = false;
-        // Modèle indisponible → on le retire des listes et on bascule sur un modèle dispo.
+        // Limite de débit (free tier) : exclusion TEMPORAIRE + bascule auto sur un modèle dispo.
+        const rateLimited = /^RATE_LIMIT:/.test(e.message) || /resource.?exhausted|rate.?limit|quota|too many requests|\b429\b/i.test(e.message);
+        // Modèle indisponible (permanent) : message d'erreur typé « modèle ».
         const modelIssue = /selected model|may not exist|access to it|model.*not.*available/i.test(e.message);
-        if (s.model && modelIssue) {
-          settings.markModelUnavailable(s.model);
-          const fallback = ["opus", "sonnet", "haiku", "fable"].find(
-            (m) => m !== s.model && !settings.unavailableModels.includes(m),
+        if (s.model && rateLimited) {
+          settings.markModelUnavailable(s.model, s.provider, 60_000); // cooldown ~60s
+          const fb = modelStore.visibleFor(s.provider).find(
+            (m) => m.v !== s.model && !settings.isUnavailable(s.provider, m.v),
           );
-          s.model = fallback ?? null;
+          if (fb) s.model = fb.v;
+          s.error = "Modèle en limite de débit — bascule temporaire.";
+          s.streaming = false;
+        } else if (s.model && modelIssue) {
+          s.error = e.message;
+          s.streaming = false;
+          settings.markModelUnavailable(s.model, s.provider);
+          const fb = modelStore.visibleFor(s.provider).find(
+            (m) => m.v !== s.model && !settings.isUnavailable(s.provider, m.v),
+          );
+          s.model = fb?.v ?? null;
         } else {
+          s.error = e.message;
+          s.streaming = false;
           // Mode Hermes : erreur réelle (hors souci de modèle) → apprentissage auto.
           this.maybeLearn(s, e.message);
         }

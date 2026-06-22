@@ -6,7 +6,8 @@
   import Icon from "../ui/Icon.svelte";
   import SkillsView from "./SkillsView.svelte";
   import McpView from "./McpView.svelte";
-  import { tour } from "$lib/stores/tour.svelte";
+  import PluginsView from "./PluginsView.svelte";
+  import { tour } from "$lib/stores/data/tour.svelte";
 
   async function pickDefaultCwd() {
     const p = await ipc.pickFolder(settings.defaultCwd);
@@ -14,7 +15,7 @@
   }
   import { tooltip } from "$lib/actions/tooltip";
   import { effortsFor, effortsForProvider, PERM_MODES, PROVIDERS, tierOf, priceHint } from "../chat/chat-config";
-  import { modelStore } from "$lib/stores/models.svelte";
+  import { modelStore } from "$lib/stores/data/models.svelte";
 
   // Active l'auto-modèle ; à l'activation, coche par défaut tous les modèles dispo sauf Fable
   // (si aucun choix valide actuel).
@@ -63,10 +64,10 @@
   let { onclose, onconnections }: { onclose: () => void; onconnections: () => void } = $props();
 
   // Vue active du modal : réglages | skills | serveurs MCP.
-  let view = $state<"settings" | "skills" | "mcp">("settings");
+  let view = $state<"settings" | "skills" | "mcp" | "plugins">("settings");
   let settingsTab = $state<"ia" | "agent" | "app" | "general">("ia");
-  const titles = { settings: "Paramètres", skills: "Skills", mcp: "Serveurs MCP" };
-  function toggle(v: "skills" | "mcp") {
+  const titles = { settings: "Paramètres", skills: "Skills", mcp: "Serveurs MCP", plugins: "Plugins" };
+  function toggle(v: "skills" | "mcp" | "plugins") {
     view = view === v ? "settings" : v;
   }
 
@@ -109,6 +110,11 @@
     PROVIDERS.filter((p) => auth.isConnected(p.id)).flatMap((p) =>
       modelStore.visibleFor(p.id).map((m) => ({ v: m.v, l: `${p.label}: ${m.l}`, hint: priceHint(m.v) })),
     ),
+  );
+  const pickerProvider = $derived(
+    PROVIDERS.find((p) =>
+      modelStore.visibleFor(p.id).some((m) => m.v === (settings.autoPicker || ""))
+    )?.id ?? "claude_code"
   );
   // Picker Claude uniquement (pour Hermes — reflect_and_learn utilise claude_bin exclusivement).
   const claudePickerOptions = $derived(
@@ -158,6 +164,14 @@
         >
           <Icon name="plug" size={17} />
         </button>
+        <button
+          class="icon-btn"
+          class:on={view === "plugins"}
+          use:tooltip={"Plugins"}
+          onclick={() => toggle("plugins")}
+        >
+          <Icon name="package" size={17} />
+        </button>
         <span class="m-sep"></span>
         <button class="icon-btn" use:tooltip={"Fermer"} onclick={onclose}>
           <Icon name="close" />
@@ -169,6 +183,8 @@
       <SkillsView />
     {:else if view === "mcp"}
       <McpView />
+    {:else if view === "plugins"}
+      <PluginsView />
     {:else}
     <div class="s-tabs">
       <button class="s-tab" class:on={settingsTab === "ia"} onclick={() => (settingsTab = "ia")}>IA</button>
@@ -294,13 +310,21 @@
             <span>Modèle qui choisit (global)</span>
             <span class="sub">UN décideur · choisit l'IA + le modèle parmi tous les candidats cochés</span>
           </div>
-          <Dropdown
-            label="Auto"
-            options={pickerOptions}
-            maxVisible={8}
-            value={settings.autoPicker || modelStore.pickerDefaultFor("claude_code")}
-            onchange={(v) => settings.setAutoPicker(v)}
-          />
+          <div class="picker-ctl">
+            <Dropdown
+              label="Auto"
+              options={pickerOptions}
+              maxVisible={8}
+              value={settings.autoPicker || modelStore.pickerDefaultFor("claude_code")}
+              onchange={(v) => settings.setAutoPicker(v)}
+            />
+            <Dropdown
+              label="Effort"
+              options={effLevels.map((e) => ({ v: e, l: e }))}
+              value={settings.autoPickerEffort || "low"}
+              onchange={(v) => settings.setAutoPickerEffort(v)}
+            />
+          </div>
         </div>
       {/if}
 
@@ -328,7 +352,7 @@
         </div>
         <Dropdown
           label="Modèle"
-          options={claudePickerOptions}
+          options={pickerOptions}
           maxVisible={8}
           value={settings.hermesModel || modelStore.pickerDefaultFor("claude_code")}
           onchange={(v) => settings.setHermesModel(v)}
@@ -502,12 +526,12 @@
       <!-- ── Général ────────────────────────────────────── -->
       <div class="s-section">Général</div>
 
-      <button class="row check" use:tooltip={"Dossier ouvert par défaut dans les nouveaux chats — l'agent travaille depuis cet emplacement"} onclick={pickDefaultCwd}>
+      <button class="row nav-row" use:tooltip={"Dossier ouvert par défaut dans les nouveaux chats — l'agent travaille depuis cet emplacement"} onclick={pickDefaultCwd}>
         <div class="lbl">
           <span>Dossier de travail par défaut</span>
           <span class="sub">{settings.defaultCwd || "Dossier personnel"}</span>
         </div>
-        <span class="na">Changer</span>
+        <span class="chev-right"><Icon name="chevron" size={16} /></span>
       </button>
 
       <div class="row" use:tooltip={"Nombre de conversations affichées dans le panneau historique (icône horloge)"}>
@@ -811,6 +835,12 @@
     transform: translateX(17px);
   }
 
+  .picker-ctl {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
   /* Réglage mode privé auto : presets + temps custom */
   .priv-ctl {
     display: flex;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { sessions } from "$lib/stores/sessions.svelte";
   import { settings } from "$lib/stores/settings.svelte";
-  import { activity } from "$lib/stores/activity.svelte";
+  import { activity } from "$lib/stores/data/activity.svelte";
   import * as ipc from "$lib/ipc";
   import Icon from "../ui/Icon.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";

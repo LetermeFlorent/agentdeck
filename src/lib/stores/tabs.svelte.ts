@@ -147,6 +147,23 @@ class TabsStore {
     this.touch();
   }
 
+  /** Tous les sids ouverts, tous onglets confondus (dédupliqués). */
+  allSessionIds(): string[] {
+    this.commitActive();
+    const ids = new Set<string>();
+    for (const t of this.list) for (const sid of collectSids(t.root)) ids.add(sid);
+    return [...ids];
+  }
+
+  /** Bascule sur l'onglet contenant `sid`. Vrai si trouvé. */
+  focusSession(sid: string): boolean {
+    this.commitActive();
+    const t = this.list.find((t) => collectSids(t.root).includes(sid));
+    if (!t) return false;
+    this.select(t.id);
+    return true;
+  }
+
   serialize(): Tab[] {
     this.commitActive();
     return this.list.map((t) => ({ id: t.id, name: t.name, root: t.root }));

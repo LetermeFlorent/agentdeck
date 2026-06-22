@@ -1,8 +1,7 @@
 // Auto-config : choisit modèle + effort adaptés à une demande (mode « Auto »).
 // Niveaux d'effort lus dynamiquement du CLI ; décision par un appel Haiku jetable.
 
-use crate::auth;
-use crate::provider;
+use crate::provider::{self, headless, Provider};
 
 /// Niveaux d'effort valides, lus dynamiquement depuis `claude --help` (--effort <level>).
 #[tauri::command]
@@ -39,82 +38,26 @@ pub struct AutoPick {
     pub effort: String,
 }
 
-/// Choisit modèle + effort pour une demande via un appel Haiku jetable (cheap).
+/// Choisit modèle + effort pour une demande via un appel jetable au « choisisseur » de l'IA active.
+/// Le choisisseur tourne sur le MÊME provider que le chat (Claude / opencode / Gemini).
 #[tauri::command]
 pub async fn auto_pick(
+    provider: Option<String>,
     prompt: String,
     models: Vec<String>,
     efforts: Vec<String>,
     picker: Option<String>,
+    picker_effort: Option<String>,
 ) -> AutoPick {
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-
-    // Connexion agentdeck indépendante : il faut notre propre token dans le coffre
-    // (une session `claude` native ne suffit pas, sinon l'UI montre « connecté » à tort).
-    let token = auth::get_token();
-    if token.is_none() {
-        return AutoPick::default();
-    }
-    // L'instruction complète (avec prix/récence) est construite côté frontend et passée telle
-    // quelle dans `prompt` — ce qui permet aussi de l'afficher en aperçu dans les réglages.
-    let msg = serde_json::json!({
-        "type": "user",
-        "message": { "role": "user", "content": [{ "type": "text", "text": prompt }] }
-    })
-    .to_string();
-
-    let mut cmd = tokio::process::Command::new(provider::claude_code::claude_bin());
-    cmd.arg("-p")
-        .arg("--input-format")
-        .arg("stream-json")
-        .arg("--output-format")
-        .arg("stream-json")
-        .arg("--verbose")
-        .arg("--permission-mode")
-        .arg("bypassPermissions")
-        .arg("--model")
-        .arg(picker.as_deref().filter(|p| !p.is_empty()).unwrap_or("haiku"))
-        .env_remove("ANTHROPIC_API_KEY")
-        .env_remove("ANTHROPIC_AUTH_TOKEN")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .kill_on_drop(true);
-    if let Some(t) = &token {
-        cmd.env("CLAUDE_CODE_OAUTH_TOKEN", t);
-    }
-
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(_) => return AutoPick::default(),
+    let prov = Provider::from_str(provider.as_deref().unwrap_or("claude_code"));
+    let picker = picker.unwrap_or_default();
+    let effort = picker_effort.unwrap_or_else(|| "low".into());
+    // Le choisisseur tourne en headless sur le même provider que le chat.
+    let text = match prov {
+        Provider::ClaudeCode => headless::claude_oneshot(&prompt, &picker, Some(&effort), 30).await,
+        Provider::Opencode => headless::opencode_oneshot(&prompt, &picker, &effort, 40).await,
+        Provider::Gemini => headless::gemini_oneshot(&prompt, &picker, 40).await,
     };
-    if let Some(mut si) = child.stdin.take() {
-        let _ = si.write_all(msg.as_bytes()).await;
-        let _ = si.write_all(b"\n").await;
-        let _ = si.flush().await;
-    }
-    let stdout = child.stdout.take();
-    let read = async {
-        let mut text = String::new();
-        if let Some(out) = stdout {
-            let mut lines = BufReader::new(out).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(line.trim()) {
-                    if v.get("type").and_then(|x| x.as_str()) == Some("result") {
-                        if let Some(r) = v.get("result").and_then(|x| x.as_str()) {
-                            text = r.to_string();
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-        text
-    };
-    let text = tokio::time::timeout(std::time::Duration::from_secs(30), read)
-        .await
-        .unwrap_or_default();
-    let _ = child.start_kill();
 
     // Extrait le JSON {...}.
     let json = match (text.find('{'), text.rfind('}')) {

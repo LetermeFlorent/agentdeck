@@ -2,7 +2,7 @@
   // Tour guidé du 1er lancement : spotlight sur un élément + bulle explicative, séquentiel.
   // Cible les éléments via leur attribut data-tour. Une étape sans cible est sautée.
   // La bulle et le spotlight restent toujours dans la fenêtre (clamp).
-  import { tour } from "$lib/stores/tour.svelte";
+  import { tour } from "$lib/stores/data/tour.svelte";
   import { fade } from "svelte/transition";
 
   interface Step {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { activity } from "$lib/stores/activity.svelte";
+  import { activity } from "$lib/stores/data/activity.svelte";
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import { fly } from "svelte/transition";

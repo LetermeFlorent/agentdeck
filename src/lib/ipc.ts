@@ -11,6 +11,7 @@ export interface SessionInfo {
   started: boolean;
   cwd: string | null;
   model: string | null;
+  provider?: string;
 }
 
 /** Image jointe à un message : base64 brut (sans préfixe data:) + type MIME. */
@@ -53,20 +54,27 @@ export type SessionEvent =
   | { kind: "error"; message: string }
   | { kind: "exited"; code: number | null };
 
-// ---- Auth ----
-export const authStatus = () => invoke<boolean>("auth_status");
-export const authSetToken = (token: string) => invoke<void>("auth_set_token", { token });
-export const authClear = () => invoke<void>("auth_clear");
+// ---- Auth (par provider ; défaut claude_code) ----
+export const authStatus = (provider?: string) =>
+  invoke<boolean>("auth_status", { provider: provider ?? null });
+export const authSetToken = (token: string, provider?: string) =>
+  invoke<void>("auth_set_token", { token, provider: provider ?? null });
+export const authClear = (provider?: string) =>
+  invoke<void>("auth_clear", { provider: provider ?? null });
 export const authImportFromFile = (path?: string) =>
   invoke<void>("auth_import_from_file", { path: path ?? null });
-export const authLogin = () => invoke<void>("auth_login");
+export const authLogin = (provider?: string) =>
+  invoke<void>("auth_login", { provider: provider ?? null });
+export const cliTerminalLogin = (provider: string) =>
+  invoke<void>("cli_terminal_login", { provider });
 
 // ---- Sessions ----
-export const sessionCreate = (opts: { title?: string; cwd?: string; model?: string } = {}) =>
+export const sessionCreate = (opts: { title?: string; cwd?: string; model?: string; provider?: string } = {}) =>
   invoke<string>("session_create", {
     title: opts.title ?? null,
     cwd: opts.cwd ?? null,
     model: opts.model ?? null,
+    provider: opts.provider ?? null,
   });
 export const sessionList = () => invoke<SessionInfo[]>("session_list");
 export const sessionRestore = (s: {
@@ -75,6 +83,7 @@ export const sessionRestore = (s: {
   started: boolean;
   cwd?: string;
   model?: string;
+  provider?: string;
 }) =>
   invoke<void>("session_restore", {
     id: s.id,
@@ -82,6 +91,7 @@ export const sessionRestore = (s: {
     started: s.started,
     cwd: s.cwd ?? null,
     model: s.model ?? null,
+    provider: s.provider ?? null,
   });
 export const sessionSend = (
   id: string,
@@ -91,6 +101,7 @@ export const sessionSend = (
   images?: ImageInput[],
   hermes?: boolean,
   perm?: { mode?: string | null; allowed?: string | null; disallowed?: string | null },
+  provider?: string,
 ) =>
   invoke<void>("session_send", {
     id,
@@ -102,6 +113,7 @@ export const sessionSend = (
     permMode: perm?.mode ?? null,
     allowed: perm?.allowed ?? null,
     disallowed: perm?.disallowed ?? null,
+    provider: provider ?? null,
   });
 
 // ---- Dossier de travail (cwd) : home + navigateur de dossiers ----
@@ -134,8 +146,22 @@ export const loadMessages = (id: string) =>
 
 // ---- Mode Auto : niveaux d'effort dynamiques + choix modèle/effort par Haiku ----
 export const effortLevels = () => invoke<string[]>("effort_levels");
-export const autoPick = (prompt: string, models: string[], efforts: string[], picker?: string) =>
-  invoke<{ model: string; effort: string }>("auto_pick", { prompt, models, efforts, picker: picker ?? null });
+export const autoPick = (
+  provider: string,
+  prompt: string,
+  models: string[],
+  efforts: string[],
+  picker?: string,
+  pickerEffort?: string,
+) =>
+  invoke<{ model: string; effort: string }>("auto_pick", {
+    provider,
+    prompt,
+    models,
+    efforts,
+    picker: picker ?? null,
+    pickerEffort: pickerEffort ?? null,
+  });
 
 // ---- Mode Hermes : réflexion auto sur échec → écrit un skill ----
 export const reflectAndLearn = (
@@ -143,15 +169,22 @@ export const reflectAndLearn = (
   request: string,
   summary: string,
   error: string,
-) => invoke<string>("reflect_and_learn", { cwd: cwd ?? null, request, summary, error });
+  model?: string,
+  provider?: string,
+) => invoke<string>("reflect_and_learn", { cwd: cwd ?? null, request, summary, error, model: model || null, provider: provider ?? null });
 export const sessionStop = (id: string) => invoke<void>("session_stop", { id });
 export const sessionClose = (id: string) => invoke<void>("session_close", { id });
 
 // ---- Usage ----
 export const usageGet = () => invoke<UsageSnapshot>("usage_get");
+export const usageGetProvider = (provider: string) => invoke<UsageSnapshot>("usage_get_provider", { provider });
 
 // ---- Modèles disponibles (API Models, via token coffre) ----
 export const claudeModels = () => invoke<{ v: string; l: string }[]>("claude_models");
+
+// ---- Modèles d'un provider (claude_code / opencode / gemini) ----
+export const providerModels = (provider: string) =>
+  invoke<{ v: string; l: string }[]>("provider_models", { provider });
 
 // ---- Défauts modèle/effort (Claude Code courant) ----
 export const claudeDefaults = () =>
@@ -168,6 +201,12 @@ export const netCheck = () => invoke<boolean>("net_check");
 export const checkClaude = () => invoke<boolean>("check_claude");
 export const installClaude = () => invoke<void>("install_claude");
 
+// ---- Dépendance CLI par provider ----
+export const providerInstalled = (provider: string) =>
+  invoke<boolean>("provider_installed", { provider });
+export const providerInstallCmd = (provider: string) =>
+  invoke<string>("provider_install_cmd", { provider });
+
 // ---- Ouvrir une URL dans le navigateur par défaut ----
 export const openUrl = (url: string) => openExternalUrl(url);
 
@@ -177,13 +216,27 @@ export interface SlashCmd {
   description: string;
   /** Indice d'arguments (ex. "[message]") — vide si aucun. */
   args: string;
+  /** CLI source (ex. "Claude"). */
+  cli: string;
 }
-export const slashCommandsFetch = () => invoke<SlashCmd[]>("slash_commands");
+export const slashCommandsFetch = (provider: string) => invoke<SlashCmd[]>("slash_commands", { provider });
 
 // ---- Bibliothèque : skills + MCP ----
 export interface SkillItem {
   name: string;
   description: string;
+  /** "user" (supprimable) ou nom du plugin (fourni, lecture seule). */
+  source: string;
+  removable: boolean;
+}
+export interface PluginItem {
+  id: string; // "nom@marketplace"
+  name: string;
+  marketplace: string;
+  version: string;
+  description: string;
+  skills: number;
+  scope: string;
 }
 export interface McpItem {
   name: string;
@@ -193,15 +246,25 @@ export interface McpItem {
   removable: boolean;
 }
 export const skillsInstalled = () => invoke<SkillItem[]>("skills_installed");
-export const skillWrite = (name: string, content: string) =>
-  invoke<void>("skill_write", { name, content });
-export const skillDelete = (name: string) => invoke<void>("skill_delete", { name });
+/** Skills d'un projet (<cwd>/.claude/skills). */
+export const projectSkills = (cwd: string) => invoke<SkillItem[]>("project_skills", { cwd });
+export const skillWrite = (name: string, content: string, cwd?: string | null) =>
+  invoke<void>("skill_write", { name, content, cwd: cwd ?? null });
+export const skillRead = (name: string, cwd?: string | null) =>
+  invoke<string>("skill_read", { name, cwd: cwd ?? null });
+export const skillDelete = (name: string, cwd?: string | null) =>
+  invoke<void>("skill_delete", { name, cwd: cwd ?? null });
+export const pluginsInstalled = () => invoke<PluginItem[]>("plugins_installed");
+export const pluginUninstall = (id: string, scope?: string) =>
+  invoke<void>("plugin_uninstall", { id, scope: scope ?? null });
 export const mcpInstalled = () => invoke<McpItem[]>("mcp_installed");
 export const mcpAdd = (name: string, target: string, transport?: string) =>
   invoke<void>("mcp_add", { name, target, transport: transport ?? null });
 export const mcpAddJson = (name: string, json: string) =>
   invoke<void>("mcp_add_json", { name, json });
 export const mcpRemove = (name: string) => invoke<void>("mcp_remove", { name });
+export const mcpReadRaw = () => invoke<string>("mcp_read_raw");
+export const mcpWriteRaw = (json: string) => invoke<void>("mcp_write_raw", { json });
 
 // ---- Nom d'utilisateur du PC (accueil démarrage) ----
 export const osUsername = () => invoke<string>("os_username");

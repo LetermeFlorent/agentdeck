@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { theme, type ThemeChoice } from "$lib/stores/theme.svelte";
+  import { theme, type ThemeChoice } from "$lib/stores/data/theme.svelte";
   import Icon from "./Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
 

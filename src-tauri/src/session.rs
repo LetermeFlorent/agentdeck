@@ -11,10 +11,19 @@ use tokio::process::{Child, ChildStdin};
 use tokio::sync::Mutex as TokioMutex;
 use uuid::Uuid;
 
-/// Process persistant d'une session + son stdin (pour injecter les messages).
+use crate::provider::Provider;
+
+/// Process d'une session + son stdin (pour injecter les messages).
+/// Claude = process persistant (stdin `Some`, réutilisé). opencode/Gemini = « one-shot » :
+/// un nouveau child par message, `stdin` à `None`, `child` = dernier process en vol (pour l'arrêt).
 pub struct SessionProc {
+    /// Provider du process (informatif ; le dispatch se fait via `SessionMeta.provider`).
+    #[allow(dead_code)]
+    pub provider: Provider,
     pub child: Child,
-    pub stdin: ChildStdin,
+    pub stdin: Option<ChildStdin>,
+    /// Id de session natif du provider one-shot (ex. opencode `ses_…`), pour reprendre la conversation.
+    pub ext_session: Option<String>,
     pub model: Option<String>,
     pub effort: Option<String>,
     /// Permissions actives du process (pour décider d'un respawn si elles changent).
@@ -30,6 +39,7 @@ pub struct SessionMeta {
     pub title: String,
     pub cwd: Option<String>,
     pub model: Option<String>,
+    pub provider: Provider,
     pub proc: SharedProc,
 }
 
@@ -39,6 +49,7 @@ pub struct SessionInfo {
     pub title: String,
     pub cwd: Option<String>,
     pub model: Option<String>,
+    pub provider: String,
 }
 
 #[derive(Default)]
@@ -47,9 +58,15 @@ pub struct SessionManager {
 }
 
 impl SessionManager {
-    pub fn create(&self, title: Option<String>, cwd: Option<String>, model: Option<String>) -> String {
+    pub fn create(
+        &self,
+        title: Option<String>,
+        cwd: Option<String>,
+        model: Option<String>,
+        provider: Provider,
+    ) -> String {
         let id = Uuid::new_v4().to_string();
-        self.insert(id.clone(), title, cwd, model);
+        self.insert(id.clone(), title, cwd, model, provider);
         id
     }
 
@@ -62,16 +79,25 @@ impl SessionManager {
         _started: bool,
         cwd: Option<String>,
         model: Option<String>,
+        provider: Provider,
     ) {
-        self.insert(id, title, cwd, model);
+        self.insert(id, title, cwd, model, provider);
     }
 
-    fn insert(&self, id: String, title: Option<String>, cwd: Option<String>, model: Option<String>) {
+    fn insert(
+        &self,
+        id: String,
+        title: Option<String>,
+        cwd: Option<String>,
+        model: Option<String>,
+        provider: Provider,
+    ) {
         let meta = SessionMeta {
             id: id.clone(),
             title: title.unwrap_or_else(|| "Claude".to_string()),
             cwd,
             model,
+            provider,
             proc: Arc::new(TokioMutex::new(None)),
         };
         self.sessions.lock().insert(id, meta);
@@ -86,17 +112,30 @@ impl SessionManager {
                 title: m.title.clone(),
                 cwd: m.cwd.clone(),
                 model: m.model.clone(),
+                provider: m.provider.as_str().to_string(),
             })
             .collect();
         v.sort_by(|a, b| a.id.cmp(&b.id));
         v
     }
 
-    /// Contexte d'envoi : (handle process partagé, cwd) si la session existe.
-    pub fn send_ctx(&self, id: &str) -> Option<(SharedProc, Option<String>)> {
+    /// Contexte d'envoi : (provider, handle process partagé, cwd) si la session existe.
+    pub fn send_ctx(&self, id: &str) -> Option<(Provider, SharedProc, Option<String>)> {
         let map = self.sessions.lock();
         let m = map.get(id)?;
-        Some((m.proc.clone(), m.cwd.clone()))
+        Some((m.provider, m.proc.clone(), m.cwd.clone()))
+    }
+
+    /// Met à jour l'IA d'une session (changement manuel ou auto cross-IA). True si elle a changé.
+    pub fn set_provider(&self, id: &str, provider: Provider) -> bool {
+        let mut map = self.sessions.lock();
+        match map.get_mut(id) {
+            Some(m) if m.provider != provider => {
+                m.provider = provider;
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Change le dossier de travail d'une session et renvoie son process (à tuer pour

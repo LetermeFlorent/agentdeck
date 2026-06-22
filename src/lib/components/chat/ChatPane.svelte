@@ -3,8 +3,8 @@
   import Icon from "../ui/Icon.svelte";
   import { tooltip } from "$lib/actions/tooltip";
   import PaneHeader from "./PaneHeader.svelte";
-  import MessageLog from "./MessageLog.svelte";
-  import Composer from "./Composer.svelte";
+  import MessageLog from "./messages/MessageLog.svelte";
+  import Composer from "./input/Composer.svelte";
 
   let {
     sid,

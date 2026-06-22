@@ -4,6 +4,7 @@
 export function tooltip(node: HTMLElement, text: string) {
   let tip: HTMLDivElement | null = null;
   let current = text;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
   function place() {
     if (!tip) return;
@@ -33,13 +34,19 @@ export function tooltip(node: HTMLElement, text: string) {
   }
 
   function hide() {
+    if (timer) { clearTimeout(timer); timer = null; }
     if (tip) {
       tip.remove();
       tip = null;
     }
   }
 
-  node.addEventListener("mouseenter", show);
+  function scheduleShow() {
+    if (!current || tip) return;
+    timer = setTimeout(show, 600);
+  }
+
+  node.addEventListener("mouseenter", scheduleShow);
   node.addEventListener("mouseleave", hide);
   node.addEventListener("pointerdown", hide);
 
@@ -50,7 +57,7 @@ export function tooltip(node: HTMLElement, text: string) {
     },
     destroy() {
       hide();
-      node.removeEventListener("mouseenter", show);
+      node.removeEventListener("mouseenter", scheduleShow);
       node.removeEventListener("mouseleave", hide);
       node.removeEventListener("pointerdown", hide);
     },

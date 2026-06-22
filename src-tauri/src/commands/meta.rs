@@ -1,10 +1,86 @@
-// Commandes « méta » : usage, défauts modèle/effort, plan d'abonnement.
+// Commandes « méta » : usage, défauts modèle/effort, plan d'abonnement, liste de modèles par IA.
 
+use crate::provider::Provider;
 use crate::usage::{self, UsageSnapshot, UsageStore};
+
+/// Modèles disponibles pour un provider donné (dispatch). `[{v: id, l: label}]`.
+#[tauri::command]
+pub async fn provider_models(provider: String) -> Vec<serde_json::Value> {
+    match Provider::from_str(&provider) {
+        Provider::ClaudeCode => claude_models().await,
+        Provider::Opencode => opencode_models().await,
+        Provider::Gemini => gemini_models(),
+    }
+}
+
+/// Modèles opencode : `opencode models` (liste `provider/model`). On ne garde que les modèles
+/// des providers réellement configurés (auth.json) + les modèles intégrés `opencode/*` (free/zen).
+async fn opencode_models() -> Vec<serde_json::Value> {
+    // Providers configurés (clés de auth.json) — sinon la liste catalogue fait des centaines d'entrées.
+    let mut authed: std::collections::HashSet<String> = std::collections::HashSet::new();
+    authed.insert("opencode".to_string());
+    if let Some(mut p) = dirs::home_dir() {
+        p.push(".local");
+        p.push("share");
+        p.push("opencode");
+        p.push("auth.json");
+        if let Ok(raw) = std::fs::read_to_string(&p) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+                if let Some(obj) = v.as_object() {
+                    for k in obj.keys() {
+                        authed.insert(k.clone());
+                    }
+                }
+            }
+        }
+    }
+    let out = crate::provider::common::opencode_command()
+        .arg("models")
+        .output()
+        .await;
+    let out = match out {
+        Ok(o) if o.status.success() => o.stdout,
+        _ => return vec![],
+    };
+    let text = String::from_utf8_lossy(&out);
+    let mut models = vec![];
+    for line in text.lines() {
+        let id = line.trim();
+        if id.is_empty() {
+            continue;
+        }
+        let prov = id.split('/').next().unwrap_or("");
+        if !authed.contains(prov) {
+            continue;
+        }
+        // Label = partie modèle (après le provider) pour rester lisible dans le sélecteur.
+        let label = id.split_once('/').map(|x| x.1).unwrap_or(id);
+        models.push(serde_json::json!({ "v": id, "l": label }));
+    }
+    models
+}
+
+/// Modèles Gemini : le CLI n'expose pas de liste machine fiable → liste curée (à actualiser).
+fn gemini_models() -> Vec<serde_json::Value> {
+    [
+        ("gemini-2.5-pro", "2.5 Pro"),
+        ("gemini-2.5-flash", "2.5 Flash"),
+        ("gemini-2.5-flash-lite", "2.5 Flash-Lite"),
+        ("gemini-2.0-flash", "2.0 Flash"),
+    ]
+    .iter()
+    .map(|(v, l)| serde_json::json!({ "v": v, "l": l }))
+    .collect()
+}
 
 #[tauri::command]
 pub fn usage_get(store: tauri::State<'_, UsageStore>) -> UsageSnapshot {
     usage::snapshot(&store)
+}
+
+#[tauri::command]
+pub fn usage_get_provider(provider: String, store: tauri::State<'_, UsageStore>) -> UsageSnapshot {
+    usage::snapshot_for(&store, &provider)
 }
 
 /// Liste les modèles réellement disponibles pour le compte (API Models d'Anthropic),
@@ -12,7 +88,7 @@ pub fn usage_get(store: tauri::State<'_, UsageStore>) -> UsageSnapshot {
 /// indisponible (offline / token sans accès) → le frontend garde sa liste de secours.
 #[tauri::command]
 pub async fn claude_models() -> Vec<serde_json::Value> {
-    let token = match crate::auth::get_token() {
+    let token = match crate::auth::get_token(crate::provider::Provider::ClaudeCode) {
         Some(t) => t,
         None => return vec![],
     };
